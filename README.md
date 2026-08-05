@@ -1,4 +1,4 @@
-# Weather Router
+# Aeolus
 
 A Python library that analyzes GPS routes against weather forecasts to score riding conditions. Given a GPX file, an average speed, and a departure time, Weather Router fetches 15-minute weather data along your route and returns a distance-weighted score from **-1.0** (dangerous) to **+1.0** (ideal).
 
