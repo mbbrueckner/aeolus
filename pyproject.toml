@@ -10,9 +10,7 @@ requires-python = ">=3.10"
 authors = [{ name = "mbbrueckner" }]
 dependencies = [
     "gpxpy",
-    "rdp",
-    # rdp calls np.cross on 2D vectors, removed in numpy 2.0
-    "numpy<2",
+    "numpy",
     "openmeteo-requests",
     "openmeteo-sdk",
 ]

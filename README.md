@@ -159,7 +159,6 @@ The test suite covers GPX parsing, weather API integration, and scoring logic.
 | Package | Purpose |
 |---------|---------|
 | `gpxpy` | GPX file parsing |
-| `rdp` | Route simplification |
 | `numpy` | Numerical operations |
 | `openmeteo-requests` | Open-Meteo API client |
 | `jupyter` / `ipywidgets` | Interactive notebook UI |

@@ -11,11 +11,8 @@ from datetime import datetime, timedelta
 
 from app.models import ClusteredRoute, RoutePoint, Segment, SegmentCluster
 
-from rdp import rdp
-
 import gpxpy
 import math
-import numpy as np
 
 EARTH_RADIUS = 6_371_000
 EPSILON = 0.0005
@@ -206,9 +203,72 @@ def _simplify(points: list[RoutePoint]) -> list[RoutePoint]:
     Returns:
         Simplified list of RoutePoints.
     """
-    coords = np.array([[p.lat, p.lon] for p in points])
-    mask = rdp(coords, epsilon=EPSILON, return_mask=True)
+    mask = _rdp_mask([(p.lat, p.lon) for p in points], EPSILON)
     return [p for p, keep in zip(points, mask) if keep]
+
+
+def _rdp_mask(coords: list[tuple[float, float]], epsilon: float) -> list[bool]:
+    """Mark which points survive Ramer-Douglas-Peucker simplification.
+
+    Args:
+        coords: Points as (lat, lon) tuples.
+        epsilon: Maximum perpendicular distance in degrees for a point to be
+            considered redundant.
+
+    Returns:
+        One flag per input point; True marks a point that is kept.
+    """
+    keep = [True] * len(coords)
+    if len(coords) < 3:
+        return keep
+
+    stack = [(0, len(coords) - 1)]
+    while stack:
+        start, last = stack.pop()
+
+        furthest = start
+        max_distance = 0.0
+        for i in range(start + 1, last):
+            if not keep[i]:
+                continue
+            distance = _perpendicular_distance(coords[i], coords[start], coords[last])
+            if distance > max_distance:
+                furthest = i
+                max_distance = distance
+
+        if max_distance > epsilon:
+            stack.append((start, furthest))
+            stack.append((furthest, last))
+        else:
+            for i in range(start + 1, last):
+                keep[i] = False
+
+    return keep
+
+
+def _perpendicular_distance(
+    point: tuple[float, float],
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> float:
+    """Distance from a point to the line through start and end.
+
+    Args:
+        point: Point as (lat, lon).
+        start: First point defining the line.
+        end: Second point defining the line.
+
+    Returns:
+        Perpendicular distance in degrees, or the distance to start if start
+        and end coincide.
+    """
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    if dx == 0.0 and dy == 0.0:
+        return math.hypot(point[0] - start[0], point[1] - start[1])
+
+    cross = dx * (start[1] - point[1]) - dy * (start[0] - point[0])
+    return abs(cross) / math.hypot(dx, dy)
 
 
 def _max_cluster_distance(avg_speed_kmh: float, gradient_pct: float = 0.0) -> float:
