@@ -64,12 +64,11 @@ def _build_params(
         "latitude": [c.lat for c in coords],
         "longitude": [c.lon for c in coords],
         "minutely_15": ",".join(DEFAULT_MINUTELY_15),
-        "wind_speed_unit": "ms",
         "start_date": arrival_times[0].date().isoformat(),
         "end_date": arrival_times[-1].date().isoformat(),
         "models": "best_match",
         "wind_speed_unit": "kmh",
-        "precipitation_unit": "mm"
+        "precipitation_unit": "mm",
     }
 
 

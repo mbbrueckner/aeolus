@@ -109,7 +109,7 @@ class TestBuildParams:
 
     def test_wind_speed_unit_km_h(self):
         params = _build_params(self.coords, self.arrival_times)
-        assert params["wind_speed_unit"] == "ms"
+        assert params["wind_speed_unit"] == "kmh"
 
     def test_models_best_match(self):
         params = _build_params(self.coords, self.arrival_times)
