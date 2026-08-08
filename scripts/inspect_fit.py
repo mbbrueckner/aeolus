@@ -4,16 +4,21 @@ Which fields a device writes varies by model and by which sensors were paired,
 so this dumps the message types, the per-field coverage of the record stream,
 and whether the fields the calibration work depends on are present.
 
+Strava's bulk export ships activities gzipped, so .fit.gz is read directly.
+
 Usage:
     uv run --extra analysis python scripts/inspect_fit.py data/
     uv run --extra analysis python scripts/inspect_fit.py data/ride.fit
 """
 
+import gzip
 import sys
 from collections import Counter
 from pathlib import Path
 
 from garmin_fit_sdk import Decoder, Stream
+
+PATTERNS = ("*.fit", "*.FIT", "*.fit.gz", "*.FIT.gz")
 
 REQUIRED_FIELDS = [
     (("timestamp",), "arrival time, for the weather join"),
@@ -38,12 +43,12 @@ def main(argv: list[str]) -> int:
 
     target = Path(argv[1])
     if target.is_dir():
-        paths = sorted(target.rglob("*.fit")) + sorted(target.rglob("*.FIT"))
+        paths = sorted({p for pattern in PATTERNS for p in target.rglob(pattern)})
     else:
         paths = [target]
 
     if not paths:
-        print(f"No .fit files found in {target}")
+        print(f"No .fit or .fit.gz files found in {target}")
         return 1
 
     print(f"Found {len(paths)} FIT file(s)\n")
@@ -63,7 +68,10 @@ def inspect_file(path: Path) -> None:
     print("=" * 72)
 
     try:
-        stream = Stream.from_file(str(path))
+        if path.suffix.lower() == ".gz":
+            stream = Stream.from_byte_array(gzip.decompress(path.read_bytes()))
+        else:
+            stream = Stream.from_file(str(path))
         messages, errors = Decoder(stream).read()
     except Exception as exc:
         print(f"  could not decode: {exc}\n")
@@ -115,7 +123,7 @@ def _print_records(records: list[dict]) -> None:
         print("\n  No record messages — nothing to calibrate from.")
         return
 
-    counts = Counter()
+    counts: Counter[str] = Counter()
     for record in records:
         for field, value in record.items():
             if value is not None:
@@ -142,7 +150,7 @@ def _print_records(records: list[dict]) -> None:
     _print_sampling(records)
 
 
-def _print_coverage(alternatives: tuple[str, ...], counts: Counter, total: int, why: str) -> None:
+def _print_coverage(alternatives: tuple[str, ...], counts: Counter[str], total: int, why: str) -> None:
     """Print coverage for a field, or for the best of several interchangeable ones.
 
     Args:
