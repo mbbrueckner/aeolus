@@ -1,6 +1,6 @@
 # Aeolus
 
-A Python library that analyzes GPS routes against weather forecasts to score riding conditions. Given a GPX file, an average speed, and a departure time, Weather Router fetches 15-minute weather data along your route and returns a distance-weighted score from **-1.0** (dangerous) to **+1.0** (ideal).
+A Python library that analyzes GPS routes against weather forecasts to score riding conditions. Given a GPX file, an average speed, and a departure time, Aeolus fetches 15-minute weather data along your route and returns a distance-weighted score from **-1.0** (dangerous) to **+1.0** (ideal).
 
 ## How It Works
 
@@ -40,7 +40,7 @@ Each cluster is scored on a scale of **-1.0 to +1.0** using three weighted facto
 ## Project Structure
 
 ```
-weather_router/
+aeolus/
 ├── app/
 │   ├── models.py          # Data classes (RoutePoint, Segment, Cluster, ...)
 │   ├── analyzer.py        # High-level pipeline orchestration
@@ -53,8 +53,8 @@ weather_router/
 ├── tests/                 # Pytest test suite
 ├── data/
 │   └── sample.gpx         # Example GPX file
-├── environment.yml        # Conda environment definition
-└── pyproject.toml         # Project metadata
+├── pyproject.toml         # Project metadata and dependencies
+└── uv.lock                # Pinned dependency versions
 ```
 
 ---
@@ -63,27 +63,26 @@ weather_router/
 
 ### Prerequisites
 
-- [Conda](https://docs.conda.io/en/latest/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
-- Python 3.10+
+- [uv](https://docs.astral.sh/uv/)
+
+uv manages the Python toolchain itself, so no pre-installed interpreter is required.
 
 ### Setup
 
 ```bash
 git clone <repo-url>
-cd weather_router
+cd aeolus
 
-# Create and activate the conda environment
-conda env create -f environment.yml
-conda activate weather-router
+uv sync --all-extras
 ```
 
-This installs all dependencies including Jupyter, ipywidgets, and folium for the demo notebook.
+This creates `.venv/` from `uv.lock` and installs all dependencies, including Jupyter, ipywidgets, and folium for the demo notebook. Drop `--all-extras` to install only the core library.
 
 ---
 
 ## Usage
 
-> **Note:** The demo notebook is the primary way to use Weather Router right now. A full web frontend is planned for the future.
+> **Note:** The demo notebook is the primary way to use Aeolus right now. A full web frontend is planned for the future.
 
 ### Python API
 
@@ -112,14 +111,13 @@ The demo notebook (`notebooks/demo.ipynb`) provides an interactive UI to upload 
 ### Running the Notebook
 
 ```bash
-conda activate weather-router
-jupyter notebook notebooks/demo.ipynb
+uv run jupyter notebook notebooks/demo.ipynb
 ```
 
 Or launch with Voila for a clean app-like interface:
 
 ```bash
-voila notebooks/demo.ipynb
+uv run voila notebooks/demo.ipynb
 ```
 
 ### Step-by-Step Guide
@@ -149,11 +147,10 @@ voila notebooks/demo.ipynb
 ## Running Tests
 
 ```bash
-conda activate weather-router
-pytest tests/
+uv run pytest
 ```
 
-The test suite covers GPX parsing, weather API integration, and scoring logic (41 tests total).
+The test suite covers GPX parsing, weather API integration, and scoring logic.
 
 ---
 

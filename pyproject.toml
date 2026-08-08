@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "weather-router"
+name = "aeolus"
 version = "1.0.0"
 description = "Analyze GPS routes against weather forecasts to score riding conditions."
 requires-python = ">=3.10"
@@ -11,7 +11,8 @@ authors = [{ name = "mbbrueckner" }]
 dependencies = [
     "gpxpy",
     "rdp",
-    "numpy",
+    # rdp calls np.cross on 2D vectors, removed in numpy 2.0
+    "numpy<2",
     "openmeteo-requests",
     "openmeteo-sdk",
 ]
@@ -23,6 +24,8 @@ notebook = [
     "folium",
     "voila",
 ]
+
+[dependency-groups]
 dev = [
     "pytest",
 ]

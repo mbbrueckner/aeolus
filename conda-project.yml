@@ -1,6 +1,0 @@
-name: weather_router
-environments:
-  weather-router:
-    - environment.yml
-variables: {}
-commands: {}

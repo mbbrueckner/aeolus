@@ -27,13 +27,13 @@ htmlcov/
 .env.*
 *.env
 
-# Conda
-.conda/
-envs/
-.condarc
+# uv / venv
+.venv/
+venv/
 
-# VS Code
+# IDEs
 .vscode/*
+.idea/
 
 # Data files (may contain sensitive GPS data)
 data/
