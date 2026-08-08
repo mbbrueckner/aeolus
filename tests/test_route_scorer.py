@@ -5,18 +5,16 @@ import pytest
 from datetime import datetime, timezone
 from app.models import RoutePoint, Segment, SegmentCluster, ClusterWeatherSnapshot
 from app.services.route_scorer import (
+    DEFAULT_PARAMS,
+    ScoringParams,
+    WindAlignment,
     _deg_to_vector,
+    _gust_score,
     _invert_wind_direction,
     _mm_15_to_mm_h,
-    _categorize_wind_alignment,
+    _rain_score,
+    _wind_components,
     score_segment,
-    WindAlignment,
-    MAX_GUST_SPEED_KM_H,
-    MAX_GUST_DELTA_KM_H,
-    MAX_PRECIPITATION_MM_H,
-    MAX_TAILWIND_SPEED_KM_H,
-    MAX_HEADWIND_SPEED_KM_H,
-    MAX_CROSSWIND_SPEED_KM_H,
 )
 
 
@@ -45,6 +43,11 @@ def make_snapshot(
         wind_gusts_km_h=gust_speed_km_h,
         precipitation_mm_h=precipitation_mm_15,
     )
+
+
+def score_of(**kwargs) -> float:
+    """Score value for a snapshot built from keyword arguments."""
+    return score_segment(make_snapshot(**kwargs)).score
 
 
 # ── _invert_wind_direction ────────────────────────────────────────
@@ -107,195 +110,347 @@ def test_mm_15_to_mm_h_factor():
         assert math.isclose(_mm_15_to_mm_h(val), val * 4.0)
 
 
-# ── _categorize_wind_alignment ────────────────────────────────────
+# ── _wind_components ──────────────────────────────────────────────
 
-def test_categorize_tailwind():
-    assert _categorize_wind_alignment(0.6) == WindAlignment.TAILWIND
+def test_components_pure_tailwind():
+    """Wind from west while riding east is a full tailwind."""
+    tail, cross = _wind_components(20.0, 270.0, 90.0)
+    assert math.isclose(tail, 20.0, abs_tol=1e-9)
+    assert math.isclose(cross, 0.0, abs_tol=1e-9)
 
-def test_categorize_headwind():
-    assert _categorize_wind_alignment(-0.6) == WindAlignment.HEADWIND
+def test_components_pure_headwind():
+    tail, cross = _wind_components(20.0, 90.0, 90.0)
+    assert math.isclose(tail, -20.0, abs_tol=1e-9)
+    assert math.isclose(cross, 0.0, abs_tol=1e-9)
 
-def test_categorize_crosswind():
-    assert _categorize_wind_alignment(0.0) == WindAlignment.CROSSWIND
+def test_components_pure_crosswind():
+    tail, cross = _wind_components(20.0, 0.0, 90.0)
+    assert math.isclose(tail, 0.0, abs_tol=1e-9)
+    assert math.isclose(cross, 20.0, abs_tol=1e-9)
 
-def test_categorize_boundary_tailwind():
-    """Exactly 0.5 is still crosswind, above is tailwind."""
-    assert _categorize_wind_alignment(0.5) == WindAlignment.CROSSWIND
-    assert _categorize_wind_alignment(0.51) == WindAlignment.TAILWIND
+def test_components_preserve_magnitude():
+    """The two components must always recombine to the wind speed."""
+    for direction in range(0, 360, 15):
+        tail, cross = _wind_components(25.0, float(direction), 90.0)
+        assert math.isclose(math.hypot(tail, cross), 25.0, abs_tol=1e-9)
 
-def test_categorize_boundary_headwind():
-    """Exactly -0.5 is still crosswind, below is headwind."""
-    assert _categorize_wind_alignment(-0.5) == WindAlignment.CROSSWIND
-    assert _categorize_wind_alignment(-0.51) == WindAlignment.HEADWIND
-
-
-# ── dot product logic ─────────────────────────────────────────────
-
-def test_wind_alignment_tailwind():
-    """Wind blowing in the same direction as travel → dot close to +1."""
-    bx, by = _deg_to_vector(0.0)
-    wx, wy = _deg_to_vector(_invert_wind_direction(180.0))
-    dot = bx*wx + by*wy
-    assert math.isclose(dot, 1.0, abs_tol=1e-9)
-
-def test_wind_alignment_headwind():
-    """Wind blowing against travel direction → dot close to -1."""
-    bx, by = _deg_to_vector(0.0)
-    wx, wy = _deg_to_vector(_invert_wind_direction(0.0))
-    dot = bx*wx + by*wy
-    assert math.isclose(dot, -1.0, abs_tol=1e-9)
-
-def test_wind_alignment_crosswind():
-    """Wind blowing perpendicular to travel → dot close to 0."""
-    bx, by = _deg_to_vector(0.0)
-    wx, wy = _deg_to_vector(_invert_wind_direction(90.0))
-    dot = bx*wx + by*wy
-    assert math.isclose(dot, 0.0, abs_tol=1e-9)
+def test_components_crosswind_never_negative():
+    for direction in range(0, 360, 15):
+        _, cross = _wind_components(25.0, float(direction), 90.0)
+        assert cross >= 0.0
 
 
-# ── score_segment: Normalfälle ────────────────────────────────────
+# ── Normalfälle ───────────────────────────────────────────────────
 
-def test_perfect_tailwind_scores_positive():
-    """Wind from west, riding east → pure tailwind → positive score."""
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=20.0,
-        wind_direction_deg=270.0,
-        gust_speed_km_h=5.0,
-        precipitation_mm_15=0.0,
-        bearing_deg=90.0,
-    ))
-    assert score > 0.0
-
-def test_perfect_headwind_scores_negative():
-    """Wind from east, riding east → pure headwind → negative score."""
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=20.0,
-        wind_direction_deg=90.0,
-        gust_speed_km_h=5.0,
-        precipitation_mm_15=0.0,
-        bearing_deg=90.0,
-    ))
-    assert score < 0.0
-
-def test_crosswind_scores_near_zero():
-    """Wind from north, riding east → crosswind → score near zero."""
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=20.0,
-        wind_direction_deg=0.0,
-        gust_speed_km_h=5.0,
-        precipitation_mm_15=0.0,
-        bearing_deg=90.0,
-    ))
-    assert -0.3 < score < 0.3
-
-def test_zero_wind_scores_zero():
-    """No wind, no rain, no gusts → neutral score."""
-    score = score_segment(make_snapshot(
+def test_calm_weather_scores_neutral():
+    """No wind, no rain, no gusts → exactly neutral."""
+    score = score_of(
         wind_speed_km_h=0.0,
         wind_direction_deg=270.0,
         gust_speed_km_h=0.0,
         precipitation_mm_15=0.0,
         bearing_deg=90.0,
-    ))
+    )
     assert math.isclose(score, 0.0, abs_tol=1e-9)
 
-def test_score_always_within_bounds():
-    """Score must never exceed -1.0 to +1.0 for any input combination."""
-    for wind_dir in range(0, 360, 45):
-        for speed in [0.0, 10.0, 25.0, 49.0]:
-            score = score_segment(make_snapshot(
-                wind_speed_km_h=speed,
-                wind_direction_deg=float(wind_dir),
-                gust_speed_km_h=min(speed + 5.0, MAX_GUST_SPEED_KM_H - 1),
-                precipitation_mm_15=0.0,
-                bearing_deg=90.0,
-            ))
-            assert -1.0 <= score <= 1.0, (
-                f"Score {score} out of bounds for wind_dir={wind_dir}, speed={speed}"
-            )
+def test_light_wind_dry_day_is_not_penalised():
+    """A calm dry day with a normal gust factor must not score negative.
 
-
-# ── score_segment: Hard Blocks ────────────────────────────────────
-
-def test_excessive_gusts_returns_hard_block():
-    score = score_segment(make_snapshot(
+    Regression test: the previous model penalised every segment where gusts
+    exceeded the mean wind, which is almost always true, so ordinary good
+    conditions were dragged below zero.
+    """
+    score = score_of(
         wind_speed_km_h=10.0,
-        wind_direction_deg=270.0,
-        gust_speed_km_h=MAX_GUST_SPEED_KM_H + 1.0,
+        wind_direction_deg=0.0,
+        gust_speed_km_h=14.0,
         precipitation_mm_15=0.0,
         bearing_deg=90.0,
-    ))
-    assert score == -1.0
+    )
+    assert score > -0.15
 
-def test_excessive_gust_delta_returns_hard_block():
-    """Gusts much stronger than average wind → unpredictable → hard block."""
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=5.0,
+def test_perfect_tailwind_scores_positive():
+    score = score_of(
+        wind_speed_km_h=20.0,
         wind_direction_deg=270.0,
-        gust_speed_km_h=5.0 + MAX_GUST_DELTA_KM_H + 1.0,
+        gust_speed_km_h=26.0,
         precipitation_mm_15=0.0,
         bearing_deg=90.0,
-    ))
-    assert score == -1.0
+    )
+    assert score > 0.3
 
-def test_heavy_rain_returns_hard_block():
-    """Precipitation exceeding threshold → hard block."""
-    mm_15_threshold = (MAX_PRECIPITATION_MM_H / 4.0) + 0.1
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=10.0,
-        wind_direction_deg=270.0,
-        gust_speed_km_h=5.0,
-        precipitation_mm_15=mm_15_threshold,
-        bearing_deg=90.0,
-    ))
-    assert score == -1.0
-
-def test_excessive_tailwind_returns_hard_block():
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=MAX_TAILWIND_SPEED_KM_H + 1.0,
-        wind_direction_deg=270.0,
-        gust_speed_km_h=10.0,
-        precipitation_mm_15=0.0,
-        bearing_deg=90.0,
-    ))
-    assert score == -1.0
-
-def test_excessive_headwind_returns_hard_block():
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=MAX_HEADWIND_SPEED_KM_H + 1.0,
+def test_perfect_headwind_scores_negative():
+    score = score_of(
+        wind_speed_km_h=20.0,
         wind_direction_deg=90.0,
-        gust_speed_km_h=10.0,
+        gust_speed_km_h=26.0,
         precipitation_mm_15=0.0,
         bearing_deg=90.0,
-    ))
-    assert score == -1.0
+    )
+    assert score < -0.3
 
-def test_excessive_crosswind_returns_hard_block():
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=MAX_CROSSWIND_SPEED_KM_H + 1.0,
-        wind_direction_deg=0.0,   # Seitenwind zu Fahrtrichtung Ost
-        gust_speed_km_h=10.0,
-        precipitation_mm_15=0.0,
-        bearing_deg=90.0,
-    ))
-    assert score == -1.0
+def test_headwind_costs_more_than_tailwind_gives():
+    """Asymmetry: you lose more into the wind than you gain with it."""
+    tail = score_of(
+        wind_speed_km_h=25.0, wind_direction_deg=270.0,
+        gust_speed_km_h=25.0, precipitation_mm_15=0.0, bearing_deg=90.0,
+    )
+    head = score_of(
+        wind_speed_km_h=25.0, wind_direction_deg=90.0,
+        gust_speed_km_h=25.0, precipitation_mm_15=0.0, bearing_deg=90.0,
+    )
+    assert abs(head) > tail
 
-
-# ── score_segment: Grenzwerte ─────────────────────────────────────
-
-def test_exactly_at_gust_limit_not_hard_block():
-    """Exactly at the limit should NOT trigger hard block."""
-    score = score_segment(make_snapshot(
-        wind_speed_km_h=10.0,
+def test_storm_with_tailwind_does_not_score_well():
+    """Strong wind is unpleasant whichever way it blows."""
+    score = score_of(
+        wind_speed_km_h=45.0,
         wind_direction_deg=270.0,
-        gust_speed_km_h=MAX_GUST_SPEED_KM_H,
+        gust_speed_km_h=58.0,
         precipitation_mm_15=0.0,
         bearing_deg=90.0,
-    ))
-    assert score != -1.0
+    )
+    assert score < 0.3
 
-def test_rain_and_headwind_both_penalize():
-    """Rain + headwind should score worse than headwind alone."""
-    headwind_only = score_segment(make_snapshot(10.0, 90.0, 5.0, 0.0, 90.0))
-    headwind_rain  = score_segment(make_snapshot(10.0, 90.0, 5.0, 1.0, 90.0))
+def test_stronger_tailwind_eventually_scores_worse():
+    """The benefit of a tailwind peaks and then reverses."""
+    scores = [
+        score_of(
+            wind_speed_km_h=float(speed), wind_direction_deg=270.0,
+            gust_speed_km_h=float(speed) * 1.3, precipitation_mm_15=0.0,
+            bearing_deg=90.0,
+        )
+        for speed in (20, 30, 45, 65)
+    ]
+    assert scores[1] > scores[0]
+    assert scores[3] < scores[2] < scores[1]
+
+def test_light_wind_free_of_strength_penalty():
+    """Below the allowance, only direction matters."""
+    lenient = ScoringParams(wind_strength_weight=0.0)
+    snapshot = make_snapshot(15.0, 270.0, 20.0, 0.0, 90.0)
+    assert math.isclose(
+        score_segment(snapshot).score,
+        score_segment(snapshot, lenient).score,
+        abs_tol=1e-9,
+    )
+
+def test_crosswind_scores_mildly_negative():
+    score = score_of(
+        wind_speed_km_h=20.0,
+        wind_direction_deg=0.0,
+        gust_speed_km_h=25.0,
+        precipitation_mm_15=0.0,
+        bearing_deg=90.0,
+    )
+    assert -0.3 < score < 0.0
+
+def test_rain_and_headwind_both_penalise():
+    headwind_only = score_of(
+        wind_speed_km_h=10.0, wind_direction_deg=90.0,
+        gust_speed_km_h=14.0, precipitation_mm_15=0.0, bearing_deg=90.0,
+    )
+    headwind_rain = score_of(
+        wind_speed_km_h=10.0, wind_direction_deg=90.0,
+        gust_speed_km_h=14.0, precipitation_mm_15=1.0, bearing_deg=90.0,
+    )
     assert headwind_rain < headwind_only
+
+def test_score_always_within_bounds():
+    for wind_dir in range(0, 360, 30):
+        for speed in [0.0, 10.0, 25.0, 49.0, 80.0]:
+            for gust in [0.0, 20.0, 60.0, 120.0]:
+                for rain in [0.0, 1.0, 12.0]:
+                    score = score_of(
+                        wind_speed_km_h=speed,
+                        wind_direction_deg=float(wind_dir),
+                        gust_speed_km_h=gust,
+                        precipitation_mm_15=rain,
+                        bearing_deg=90.0,
+                    )
+                    assert -1.0 <= score <= 1.0
+
+
+# ── Gusts ─────────────────────────────────────────────────────────
+
+def test_normal_gust_factor_is_free():
+    """Gusts within the usual ratio above the mean wind cost nothing."""
+    assert _gust_score(24.0, 20.0, DEFAULT_PARAMS) == 0.0
+
+def test_gust_below_wind_speed_is_free():
+    assert _gust_score(5.0, 20.0, DEFAULT_PARAMS) == 0.0
+
+def test_squally_wind_is_penalised():
+    """Gusts far above the mean wind are the dangerous case, even when light."""
+    assert _gust_score(30.0, 5.0, DEFAULT_PARAMS) < -0.5
+
+def test_gust_penalty_is_monotonic():
+    previous = 0.0
+    for gust in range(0, 120, 5):
+        current = _gust_score(float(gust), 20.0, DEFAULT_PARAMS)
+        assert current <= previous + 1e-12
+        previous = current
+
+def test_gust_penalty_bounded():
+    assert -1.0 <= _gust_score(500.0, 0.0, DEFAULT_PARAMS) <= 0.0
+
+def test_gust_allowance_scales_with_wind():
+    """The same gust delta is ordinary in strong wind but squally in light wind."""
+    in_strong_wind = _gust_score(45.0, 30.0, DEFAULT_PARAMS)
+    in_light_wind = _gust_score(20.0, 5.0, DEFAULT_PARAMS)
+    assert in_light_wind < in_strong_wind - 0.4
+
+
+# ── Rain ──────────────────────────────────────────────────────────
+
+def test_no_rain_no_penalty():
+    assert _rain_score(0.0, DEFAULT_PARAMS) == 0.0
+
+def test_rain_penalty_is_monotonic():
+    previous = 0.0
+    for rain in range(0, 40):
+        current = _rain_score(float(rain), DEFAULT_PARAMS)
+        assert current <= previous + 1e-12
+        previous = current
+
+def test_rain_penalty_saturates():
+    """Once soaked, more rain barely matters."""
+    heavy = _rain_score(15.0, DEFAULT_PARAMS)
+    torrential = _rain_score(30.0, DEFAULT_PARAMS)
+    assert abs(torrential - heavy) < 0.01
+
+def test_rain_penalty_bounded():
+    assert -1.0 <= _rain_score(1000.0, DEFAULT_PARAMS) <= 0.0
+
+
+# ── Continuity ────────────────────────────────────────────────────
+
+def test_score_continuous_in_wind_direction():
+    """No cliff anywhere on the compass, including the old category borders."""
+    previous = None
+    for tenth_deg in range(0, 3600):
+        score = score_of(
+            wind_speed_km_h=30.0,
+            wind_direction_deg=tenth_deg / 10.0,
+            gust_speed_km_h=40.0,
+            precipitation_mm_15=0.2,
+            bearing_deg=90.0,
+        )
+        if previous is not None:
+            assert abs(score - previous) < 0.01
+        previous = score
+
+def test_score_continuous_in_wind_speed():
+    previous = None
+    for tenth in range(0, 1000):
+        score = score_of(
+            wind_speed_km_h=tenth / 10.0,
+            wind_direction_deg=120.0,
+            gust_speed_km_h=tenth / 10.0 + 8.0,
+            precipitation_mm_15=0.0,
+            bearing_deg=90.0,
+        )
+        if previous is not None:
+            assert abs(score - previous) < 0.01
+        previous = score
+
+def test_score_continuous_in_gusts():
+    """Crossing the old hard-block threshold must not snap the score."""
+    previous = None
+    for tenth in range(0, 1000):
+        score = score_of(
+            wind_speed_km_h=20.0,
+            wind_direction_deg=270.0,
+            gust_speed_km_h=tenth / 10.0,
+            precipitation_mm_15=0.0,
+            bearing_deg=90.0,
+        )
+        if previous is not None:
+            assert abs(score - previous) < 0.01
+        previous = score
+
+def test_score_continuous_in_precipitation():
+    previous = None
+    for step in range(0, 1000):
+        score = score_of(
+            wind_speed_km_h=15.0,
+            wind_direction_deg=270.0,
+            gust_speed_km_h=20.0,
+            precipitation_mm_15=step / 200.0,
+            bearing_deg=90.0,
+        )
+        if previous is not None:
+            assert abs(score - previous) < 0.01
+        previous = score
+
+
+# ── Safety flag ───────────────────────────────────────────────────
+
+def test_calm_conditions_are_safe():
+    result = score_segment(make_snapshot(10.0, 270.0, 15.0, 0.0, 90.0))
+    assert result.unsafe is False
+
+def test_storm_gusts_flagged_unsafe():
+    result = score_segment(make_snapshot(30.0, 270.0, 60.0, 0.0, 90.0))
+    assert result.unsafe is True
+
+def test_torrential_rain_flagged_unsafe():
+    result = score_segment(make_snapshot(10.0, 270.0, 15.0, 6.0, 90.0))
+    assert result.unsafe is True
+
+def test_squalls_flagged_unsafe():
+    result = score_segment(make_snapshot(10.0, 270.0, 40.0, 0.0, 90.0))
+    assert result.unsafe is True
+
+def test_unsafe_conditions_still_score_informatively():
+    """The safety veto must not collapse the score to a constant.
+
+    A storm with a tailwind and a storm with a headwind used to be
+    indistinguishable at -1.0; they should still be told apart.
+    """
+    tailwind_storm = score_segment(make_snapshot(30.0, 270.0, 60.0, 0.0, 90.0))
+    headwind_storm = score_segment(make_snapshot(30.0, 90.0, 60.0, 0.0, 90.0))
+    assert tailwind_storm.unsafe and headwind_storm.unsafe
+    assert tailwind_storm.score > headwind_storm.score
+
+def test_extreme_conditions_score_near_minimum():
+    score = score_of(
+        wind_speed_km_h=60.0,
+        wind_direction_deg=90.0,
+        gust_speed_km_h=95.0,
+        precipitation_mm_15=8.0,
+        bearing_deg=90.0,
+    )
+    assert score < -0.95
+
+
+# ── Components ────────────────────────────────────────────────────
+
+def test_components_reported_on_result():
+    result = score_segment(make_snapshot(20.0, 270.0, 25.0, 0.5, 90.0))
+    assert math.isclose(result.tailwind_km_h, 20.0, abs_tol=1e-9)
+    assert math.isclose(result.crosswind_km_h, 0.0, abs_tol=1e-9)
+    assert math.isclose(result.precipitation_mm_h, 2.0, abs_tol=1e-9)
+
+def test_alignment_tailwind():
+    assert score_segment(make_snapshot(20.0, 270.0, 25.0, 0.0, 90.0)).alignment == WindAlignment.TAILWIND
+
+def test_alignment_headwind():
+    assert score_segment(make_snapshot(20.0, 90.0, 25.0, 0.0, 90.0)).alignment == WindAlignment.HEADWIND
+
+def test_alignment_crosswind():
+    assert score_segment(make_snapshot(20.0, 0.0, 25.0, 0.0, 90.0)).alignment == WindAlignment.CROSSWIND
+
+
+# ── Parameterisation ──────────────────────────────────────────────
+
+def test_params_are_overridable():
+    """Coefficients must be injectable so they can be fitted later."""
+    snapshot = make_snapshot(20.0, 90.0, 25.0, 0.0, 90.0)
+    lenient = ScoringParams(headwind_scale_km_h=200.0)
+    assert score_segment(snapshot, lenient).score > score_segment(snapshot).score
+
+def test_weights_are_applied():
+    snapshot = make_snapshot(10.0, 270.0, 15.0, 2.0, 90.0)
+    ignore_rain = ScoringParams(rain_weight=0.0)
+    assert score_segment(snapshot, ignore_rain).score > score_segment(snapshot).score

@@ -29,8 +29,8 @@ def analyze_route(gpx_file : bytes, avg_speed_kmh: float, start_time: datetime) 
     
     total_score = 0.0
     for snapshot in weather_snapshots:
-        score = score_segment(snapshot)
-        total_score += score * snapshot.cluster.total_distance_m
+        segment_score = score_segment(snapshot)
+        total_score += segment_score.score * snapshot.cluster.total_distance_m
 
     return total_score / route_clusters.total_distance_m
     
