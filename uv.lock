@@ -34,6 +34,7 @@ notebook = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "garmin-fit-sdk" },
     { name = "pytest" },
 ]
 
@@ -52,7 +53,10 @@ requires-dist = [
 provides-extras = ["notebook", "analysis"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest" }]
+dev = [
+    { name = "garmin-fit-sdk", specifier = ">=21.212.0" },
+    { name = "pytest" },
+]
 
 [[package]]
 name = "anyio"

@@ -29,6 +29,7 @@ analysis = [
 [dependency-groups]
 dev = [
     "pytest",
+    "garmin-fit-sdk>=21.212.0",
 ]
 
 [tool.setuptools.packages.find]
