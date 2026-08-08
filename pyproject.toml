@@ -22,6 +22,9 @@ notebook = [
     "folium",
     "voila",
 ]
+analysis = [
+    "garmin-fit-sdk>=21.212.0",
+]
 
 [dependency-groups]
 dev = [

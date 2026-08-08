@@ -22,6 +22,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+analysis = [
+    { name = "garmin-fit-sdk" },
+]
 notebook = [
     { name = "folium" },
     { name = "ipywidgets" },
@@ -37,6 +40,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "folium", marker = "extra == 'notebook'" },
+    { name = "garmin-fit-sdk", marker = "extra == 'analysis'", specifier = ">=21.212.0" },
     { name = "gpxpy" },
     { name = "ipywidgets", marker = "extra == 'notebook'", specifier = ">=8.0" },
     { name = "jupyter", marker = "extra == 'notebook'" },
@@ -45,7 +49,7 @@ requires-dist = [
     { name = "openmeteo-sdk" },
     { name = "voila", marker = "extra == 'notebook'" },
 ]
-provides-extras = ["notebook"]
+provides-extras = ["notebook", "analysis"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest" }]
@@ -550,6 +554,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/30/3e/a80a8c077fd798951169626cde3e239adeba7dab75deb3555716415bd9b0/fqdn-1.5.1.tar.gz", hash = "sha256:105ed3677e767fb5ca086a0c1f4bb66ebc3c100be518f0e0d755d9eae164d89f", size = 6015, upload-time = "2021-03-11T07:16:29.08Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cf/58/8acf1b3e91c58313ce5cb67df61001fc9dcd21be4fadb76c1a2d540e09ed/fqdn-1.5.1-py3-none-any.whl", hash = "sha256:3a179af3761e4df6eb2e026ff9e1a3033d3587bf980a0b1b2e1e5d08d7358014", size = 9121, upload-time = "2021-03-11T07:16:28.351Z" },
+]
+
+[[package]]
+name = "garmin-fit-sdk"
+version = "21.212.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3c/b2/ffd32e045632fb7f75ed25a86520c3e06668f46feb9ab81df0de9bbc1e99/garmin_fit_sdk-21.212.0.tar.gz", hash = "sha256:91f22f731c00a9cdf5a787a3f8345d89c588ce995b89f9f84505540a07054526", size = 198897, upload-time = "2026-08-04T17:23:35.084Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/6c/10331cc1e528da3de4240c85bc4cf19dd40194fa815c9b5ef21068db39b2/garmin_fit_sdk-21.212.0-py3-none-any.whl", hash = "sha256:74ecf6b403df764132faad821258dc7fe2a3ddb831cc7dcc1fb0690b1a67379b", size = 219246, upload-time = "2026-08-04T17:23:33.532Z" },
 ]
 
 [[package]]
