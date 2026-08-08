@@ -12,19 +12,17 @@ A Python library that analyzes GPS routes against weather forecasts to score rid
 
 ### Scoring
 
-Each cluster is scored on a scale of **-1.0 to +1.0** using three weighted factors:
+Each cluster is scored on a scale of **-1.0 to +1.0** from three terms:
 
-| Factor | Weight | Details |
-|--------|--------|---------|
-| Wind alignment & speed | 50% | Tailwind = positive, head-/crosswind = negative |
-| Gusts | 30% | Penalized proportionally; > 20 km/h → hard block |
-| Precipitation | 20% | Linear penalty; > 20 mm/h → hard block |
+| Term | Weight | Details |
+|------|--------|---------|
+| Wind | 1.0 | Tailwind rewarded, headwind penalized harder than the same tailwind rewards, crosswind always a mild penalty, plus a direction-independent penalty for strong wind |
+| Gusts | 0.7 | Penalizes only gusts beyond the gust factor the sustained wind already implies |
+| Rain | 0.6 | Penalized with diminishing returns — once you are soaked, more rain barely matters |
 
-**Hard blocks** (score = -1.0) are triggered by:
-- Gusts above 20 km/h
-- Gust delta (gust − speed) above 10 km/h
-- Precipitation above 20 mm/h
-- Wind speed exceeding category threshold (50–60 km/h depending on direction)
+Every penalty saturates through `tanh` rather than tripping over a threshold, so the score is **continuous in every input**: a small change in wind, gusts or rain can only cause a small change in score. This also keeps the function differentiable, which is what will make it fittable to recorded rides.
+
+**Safety** is reported separately, via `SegmentScore.unsafe`, rather than by forcing the score to its minimum. This keeps a storm with a tailwind distinguishable from a storm with a headwind. It is set when sustained wind exceeds 50 km/h, gusts exceed 55 km/h, gusts exceed the sustained wind by more than 25 km/h, or rain exceeds 20 mm/h.
 
 **Score interpretation:**
 
@@ -34,6 +32,12 @@ Each cluster is scored on a scale of **-1.0 to +1.0** using three weighted facto
 | 0.0 – 0.5 | Acceptable — light cross or headwind |
 | −0.5 – 0.0 | Difficult — stronger headwind or rain |
 | −1.0 – −0.5 | Bad — strong gusts or heavy rain |
+
+> **Calibration status:** the coefficients are informed guesses, not fitted values. They all live in `ScoringParams` and can be injected into `score_segment`, which is the groundwork for fitting them against recorded rides:
+>
+> ```python
+> score_segment(snapshot, ScoringParams(headwind_scale_km_h=25.0))
+> ```
 
 ---
 
@@ -131,9 +135,10 @@ uv run voila notebooks/demo.ipynb
 7. **Read the results:**
    - The overall score is shown at the top
    - The interactive map shows your route colored from red (bad) to green (good)
+   - Dashed sections are flagged unsafe, regardless of their score
    - Wind arrows at each cluster point indicate direction and speed
    - Arrow color indicates rain (blue = rain, gray = dry)
-   - Click any arrow for a popup with wind speed, gusts, and precipitation details
+   - Click any arrow for a popup with the score and each term's contribution
 
 ### Tips
 
@@ -171,6 +176,7 @@ Weather data is fetched from [Open-Meteo](https://open-meteo.com/) — free, no 
 
 ## Roadmap
 
+- **Calibration:** Fit `ScoringParams` against recorded rides instead of hand-tuning it. GPX files carry per-point timestamps, so actual segment speed versus the speed expected for the gradient is a per-cluster label that can be recovered from past rides, rather than one subjective rating per ride.
 - **Frontend (planned):** A complete web frontend is in development. The demo notebook is the current primary interface until the frontend is ready.
 - Route optimization
 
