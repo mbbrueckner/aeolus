@@ -1,4 +1,5 @@
 export type Alignment = 'headwind' | 'crosswind' | 'tailwind'
+export type RainTier = 'light' | 'moderate' | 'heavy'
 
 export interface Segment {
   coordinates: [number, number][]
@@ -10,6 +11,7 @@ export interface Segment {
   wind_direction_deg: number
   wind_gusts_km_h: number
   precipitation_mm_h: number
+  rain_tier: RainTier | null
   alignment: Alignment
   tailwind_km_h: number
   crosswind_km_h: number
@@ -23,6 +25,12 @@ export interface Summary {
   tailwind_km: number
   crosswind_km: number
   rain_km: number
+  light_rain_km: number
+  moderate_rain_km: number
+  heavy_rain_km: number
+  rain_start_km: number | null
+  rain_start_time: string | null
+  max_precipitation_mm_h: number
   unsafe_km: number
   headwind_share: number
   tailwind_share: number

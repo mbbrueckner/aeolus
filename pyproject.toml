@@ -35,6 +35,9 @@ web = [
 dev = [
     "pytest",
     "garmin-fit-sdk>=21.212.0",
+    "fastapi>=0.141.1",
+    "python-multipart>=0.0.32",
+    "httpx>=0.28.1",
 ]
 
 [tool.setuptools.packages.find]

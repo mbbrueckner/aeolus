@@ -147,3 +147,85 @@ def test_score_is_distance_weighted():
     result = summarise_all([short_bad, long_good])
 
     assert result.score > 0.0
+
+
+# ── Rain intensity ────────────────────────────────────────────────
+
+def test_rain_tiers_split_by_intensity():
+    from app.services.summary import rain_tier
+    assert rain_tier(0.0) is None
+    assert rain_tier(0.2) is None
+    assert rain_tier(1.0) == 'light'
+    assert rain_tier(5.0) == 'moderate'
+    assert rain_tier(15.0) == 'heavy'
+
+def test_tier_boundaries_belong_to_the_heavier_band():
+    from app.services.summary import (
+        HEAVY_RAIN_MM_H, MODERATE_RAIN_MM_H, NOTABLE_RAIN_MM_H, rain_tier,
+    )
+    assert rain_tier(NOTABLE_RAIN_MM_H) == 'light'
+    assert rain_tier(MODERATE_RAIN_MM_H) == 'moderate'
+    assert rain_tier(HEAVY_RAIN_MM_H) == 'heavy'
+
+def test_drizzle_counts_as_light():
+    result = summarise_all([make_snapshot(precipitation_mm_15=0.25)])
+    assert result.light_rain_distance_m == 1000.0
+    assert result.heavy_rain_distance_m == 0.0
+
+def test_downpour_counts_as_heavy():
+    result = summarise_all([make_snapshot(precipitation_mm_15=4.0)])
+    assert result.heavy_rain_distance_m == 1000.0
+    assert result.light_rain_distance_m == 0.0
+
+def test_tiers_add_up_to_the_rain_total():
+    result = summarise_all([
+        make_snapshot(precipitation_mm_15=0.2, distance_m=1000.0),
+        make_snapshot(precipitation_mm_15=1.0, distance_m=2000.0),
+        make_snapshot(precipitation_mm_15=4.0, distance_m=3000.0),
+        make_snapshot(precipitation_mm_15=0.0, distance_m=4000.0),
+    ])
+    tiers = (
+        result.light_rain_distance_m
+        + result.moderate_rain_distance_m
+        + result.heavy_rain_distance_m
+    )
+    assert tiers == result.rain_distance_m == 6000.0
+
+def test_max_precipitation_is_the_worst_anywhere():
+    result = summarise_all([
+        make_snapshot(precipitation_mm_15=0.1),
+        make_snapshot(precipitation_mm_15=2.0),
+        make_snapshot(precipitation_mm_15=0.5),
+    ])
+    assert math.isclose(result.max_precipitation_mm_h, 8.0)
+
+
+# ── Rain onset ────────────────────────────────────────────────────
+
+def test_dry_route_has_no_onset():
+    result = summarise_all([make_snapshot(), make_snapshot()])
+    assert result.rain_start_m is None
+    assert result.rain_start_time is None
+
+def test_onset_is_measured_from_the_start():
+    """Rain in the third of three 2 km clusters starts at kilometre four."""
+    result = summarise_all([
+        make_snapshot(distance_m=2000.0),
+        make_snapshot(distance_m=2000.0),
+        make_snapshot(precipitation_mm_15=1.0, distance_m=2000.0),
+    ])
+    assert result.rain_start_m == 4000.0
+
+def test_onset_is_the_first_wet_stretch_not_the_worst():
+    result = summarise_all([
+        make_snapshot(precipitation_mm_15=0.5, distance_m=1000.0),
+        make_snapshot(precipitation_mm_15=5.0, distance_m=1000.0),
+    ])
+    assert result.rain_start_m == 0.0
+
+def test_onset_carries_the_arrival_time():
+    result = summarise_all([
+        make_snapshot(distance_m=1000.0),
+        make_snapshot(precipitation_mm_15=1.0, distance_m=1000.0),
+    ])
+    assert result.rain_start_time is not None

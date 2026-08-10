@@ -39,8 +39,11 @@ web = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "fastapi" },
     { name = "garmin-fit-sdk" },
+    { name = "httpx" },
     { name = "pytest" },
+    { name = "python-multipart" },
 ]
 
 [package.metadata]
@@ -62,8 +65,11 @@ provides-extras = ["notebook", "analysis", "web"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "fastapi", specifier = ">=0.141.1" },
     { name = "garmin-fit-sdk", specifier = ">=21.212.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
 ]
 
 [[package]]

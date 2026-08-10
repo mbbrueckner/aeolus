@@ -25,6 +25,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 
 from app.analyzer import RouteAnalysis, analyze_route
+from app.services.summary import rain_tier
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MIN_SPEED_KMH = 5.0
@@ -104,6 +105,14 @@ def _to_payload(analysis: RouteAnalysis) -> dict:
             "tailwind_km": summary.tailwind_distance_m / 1000.0,
             "crosswind_km": summary.crosswind_distance_m / 1000.0,
             "rain_km": summary.rain_distance_m / 1000.0,
+            "light_rain_km": summary.light_rain_distance_m / 1000.0,
+            "moderate_rain_km": summary.moderate_rain_distance_m / 1000.0,
+            "heavy_rain_km": summary.heavy_rain_distance_m / 1000.0,
+            "rain_start_km": (
+                summary.rain_start_m / 1000.0 if summary.rain_start_m is not None else None
+            ),
+            "rain_start_time": _isoformat(summary.rain_start_time),
+            "max_precipitation_mm_h": summary.max_precipitation_mm_h,
             "unsafe_km": summary.unsafe_distance_m / 1000.0,
             "headwind_share": summary.headwind_share,
             "tailwind_share": summary.tailwind_share,
@@ -127,6 +136,7 @@ def _to_payload(analysis: RouteAnalysis) -> dict:
                 "wind_direction_deg": snapshot.wind_direction_deg,
                 "wind_gusts_km_h": snapshot.wind_gusts_km_h,
                 "precipitation_mm_h": score.precipitation_mm_h,
+                "rain_tier": rain_tier(score.precipitation_mm_h),
                 "alignment": score.alignment.value,
                 "tailwind_km_h": score.tailwind_km_h,
                 "crosswind_km_h": score.crosswind_km_h,

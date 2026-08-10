@@ -1,5 +1,5 @@
-import type { Summary } from '../types'
-import { ALIGNMENT_COLOUR, formatKm, formatTime } from '../wind'
+import type { RainTier, Summary } from '../types'
+import { ALIGNMENT_COLOUR, RAIN_COLOUR, RAIN_LABEL, formatKm, formatTime } from '../wind'
 
 interface Props {
   summary: Summary
@@ -56,12 +56,7 @@ export function SummaryPanel({ summary }: Props) {
         <Tile label="stärkste Böe" value={summary.max_gust_km_h.toFixed(0)} unit="km/h" />
       </div>
 
-      {summary.rain_km > 0.1 && (
-        <Notice tone="info">
-          Regen auf <strong>{formatKm(summary.rain_km)} km</strong>
-          {summary.rain_share > 0.5 ? ' — also auf dem Großteil der Strecke' : ' deiner Strecke'}
-        </Notice>
-      )}
+      <RainSection summary={summary} />
 
       {summary.unsafe_km > 0.1 && (
         <Notice tone="error">
@@ -98,6 +93,74 @@ export function SummaryPanel({ summary }: Props) {
         </p>
       </details>
     </section>
+  )
+}
+
+function RainSection({ summary }: { summary: Summary }) {
+  if (summary.rain_km <= 0.05) {
+    return (
+      <p className="flex items-center gap-2 rounded-box border border-base-300/60 bg-base-200/40 px-3.5 py-2.5 text-sm opacity-65">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        >
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 3v1.5M12 19.5V21M4.5 4.5l1 1M18.5 18.5l1 1M3 12h1.5M19.5 12H21M4.5 19.5l1-1M18.5 5.5l1-1" />
+        </svg>
+        Durchgehend trocken
+      </p>
+    )
+  }
+
+  const tiers: { tier: RainTier; km: number }[] = [
+    { tier: 'light', km: summary.light_rain_km },
+    { tier: 'moderate', km: summary.moderate_rain_km },
+    { tier: 'heavy', km: summary.heavy_rain_km },
+  ]
+
+  return (
+    <div className="space-y-2.5 rounded-box border border-info/25 bg-info/8 px-3.5 py-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold text-info">Niederschlag</h3>
+        <span className="text-xs opacity-60">
+          {formatKm(summary.rain_km)} km · {(summary.rain_share * 100).toFixed(0)} %
+        </span>
+      </div>
+
+      {summary.rain_start_km !== null && (
+        <p className="text-sm leading-snug">
+          Setzt ab <strong>km {formatKm(summary.rain_start_km)}</strong> ein
+          {summary.rain_start_time && <> , gegen {formatTime(summary.rain_start_time)} Uhr</>}.
+        </p>
+      )}
+
+      <ul className="space-y-1.5">
+        {tiers
+          .filter(({ km }) => km > 0.05)
+          .map(({ tier, km }) => (
+            <li key={tier} className="flex items-center gap-2 text-sm">
+              <span
+                className="h-2 w-5 shrink-0 rounded-full"
+                style={{ background: RAIN_COLOUR[tier] }}
+              />
+              <span className="opacity-70">{RAIN_LABEL[tier]}</span>
+              <span className="ml-auto font-semibold tabular-nums">
+                {formatKm(km)}
+                <span className="ml-1 text-xs font-normal opacity-45">km</span>
+              </span>
+            </li>
+          ))}
+      </ul>
+
+      <p className="text-xs opacity-55">
+        Spitze {summary.max_precipitation_mm_h.toFixed(1)} mm/h
+      </p>
+    </div>
   )
 }
 

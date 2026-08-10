@@ -1,4 +1,4 @@
-import type { Alignment, Segment } from './types'
+import type { Alignment, RainTier, Segment } from './types'
 
 /**
  * Colours for the three wind alignments.
@@ -16,6 +16,29 @@ export const ALIGNMENT_LABEL: Record<Alignment, string> = {
   headwind: 'Gegenwind',
   crosswind: 'Seitenwind',
   tailwind: 'Rückenwind',
+}
+
+/**
+ * Rain gets its own visual channel, since colour along the route is already
+ * spent on wind direction. It is drawn as a wider casing underneath the line,
+ * deepening in blue as the rate rises.
+ */
+export const RAIN_COLOUR: Record<RainTier, string> = {
+  light: '#7dd3fc',
+  moderate: '#38bdf8',
+  heavy: '#2563eb',
+}
+
+export const RAIN_LABEL: Record<RainTier, string> = {
+  light: 'leichter Regen',
+  moderate: 'Regen',
+  heavy: 'Starkregen',
+}
+
+export const RAIN_WIDTH: Record<RainTier, number> = {
+  light: 12,
+  moderate: 15,
+  heavy: 18,
 }
 
 /** Wind below this is not worth calling a head-, tail- or crosswind. */

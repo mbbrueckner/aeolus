@@ -13,12 +13,34 @@ __author__ = "mbbrueckner"
 __version__ = "1.0.0"
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.models import ClusterWeatherSnapshot
 from app.services.route_scorer import SegmentScore, WindAlignment
 
 NOTABLE_WIND_KM_H = 12.0
 NOTABLE_RAIN_MM_H = 0.4
+MODERATE_RAIN_MM_H = 2.5
+HEAVY_RAIN_MM_H = 10.0
+
+
+def rain_tier(precipitation_mm_h: float) -> str | None:
+    """Classify a rain rate into a band a rider can picture.
+
+    Args:
+        precipitation_mm_h: Rain rate in mm/h.
+
+    Returns:
+        One of "light", "moderate" or "heavy", or None when it is dry enough
+        not to be worth mentioning.
+    """
+    if precipitation_mm_h >= HEAVY_RAIN_MM_H:
+        return "heavy"
+    if precipitation_mm_h >= MODERATE_RAIN_MM_H:
+        return "moderate"
+    if precipitation_mm_h >= NOTABLE_RAIN_MM_H:
+        return "light"
+    return None
 
 
 @dataclass(frozen=True)
@@ -30,7 +52,14 @@ class RouteSummary:
         headwind_distance_m: Distance ridden into a notable headwind.
         tailwind_distance_m: Distance ridden with a notable tailwind.
         crosswind_distance_m: Distance with a notable crosswind.
-        rain_distance_m: Distance with notable precipitation.
+        rain_distance_m: Distance with notable precipitation, of any intensity.
+        light_rain_distance_m: Distance with drizzle.
+        moderate_rain_distance_m: Distance with steady rain.
+        heavy_rain_distance_m: Distance with downpours.
+        rain_start_m: Distance from the start at which rain first appears, or
+            None if the route stays dry.
+        rain_start_time: When the rider reaches that point, or None.
+        max_precipitation_mm_h: Heaviest rain forecast anywhere on the route.
         unsafe_distance_m: Distance where conditions trip a safety threshold.
         mean_wind_km_h: Distance-weighted mean forecast wind speed.
         max_gust_km_h: Strongest gust forecast anywhere on the route.
@@ -42,6 +71,12 @@ class RouteSummary:
     tailwind_distance_m: float
     crosswind_distance_m: float
     rain_distance_m: float
+    light_rain_distance_m: float
+    moderate_rain_distance_m: float
+    heavy_rain_distance_m: float
+    rain_start_m: float | None
+    rain_start_time: datetime | None
+    max_precipitation_mm_h: float
     unsafe_distance_m: float
     mean_wind_km_h: float
     max_gust_km_h: float
@@ -92,13 +127,33 @@ def summarise(
     Returns:
         The summary. All distances are zero for an empty route.
     """
-    total = sum(s.cluster.total_distance_m for s in snapshots)
     if not snapshots:
-        return RouteSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        return RouteSummary(
+            total_distance_m=0.0,
+            headwind_distance_m=0.0,
+            tailwind_distance_m=0.0,
+            crosswind_distance_m=0.0,
+            rain_distance_m=0.0,
+            light_rain_distance_m=0.0,
+            moderate_rain_distance_m=0.0,
+            heavy_rain_distance_m=0.0,
+            rain_start_m=None,
+            rain_start_time=None,
+            max_precipitation_mm_h=0.0,
+            unsafe_distance_m=0.0,
+            mean_wind_km_h=0.0,
+            max_gust_km_h=0.0,
+            score=0.0,
+        )
 
+    total = sum(s.cluster.total_distance_m for s in snapshots)
     headwind = tailwind = crosswind = rain = unsafe = 0.0
+    by_tier = {"light": 0.0, "moderate": 0.0, "heavy": 0.0}
     weighted_wind = weighted_score = 0.0
-    max_gust = 0.0
+    max_gust = max_rain = 0.0
+    covered = 0.0
+    rain_start_m: float | None = None
+    rain_start_time = None
 
     for snapshot, score in zip(snapshots, scores):
         distance = snapshot.cluster.total_distance_m
@@ -113,12 +168,21 @@ def summarise(
 
         if score.precipitation_mm_h >= notable_rain_mm_h:
             rain += distance
+            tier = rain_tier(score.precipitation_mm_h)
+            if tier:
+                by_tier[tier] += distance
+            if rain_start_m is None:
+                rain_start_m = covered
+                rain_start_time = snapshot.timestamp
+
         if score.unsafe:
             unsafe += distance
 
         weighted_wind += snapshot.wind_speed_km_h * distance
         weighted_score += score.score * distance
         max_gust = max(max_gust, snapshot.wind_gusts_km_h)
+        max_rain = max(max_rain, score.precipitation_mm_h)
+        covered += distance
 
     return RouteSummary(
         total_distance_m=total,
@@ -126,6 +190,12 @@ def summarise(
         tailwind_distance_m=tailwind,
         crosswind_distance_m=crosswind,
         rain_distance_m=rain,
+        light_rain_distance_m=by_tier["light"],
+        moderate_rain_distance_m=by_tier["moderate"],
+        heavy_rain_distance_m=by_tier["heavy"],
+        rain_start_m=rain_start_m,
+        rain_start_time=rain_start_time,
+        max_precipitation_mm_h=max_rain,
         unsafe_distance_m=unsafe,
         mean_wind_km_h=weighted_wind / total if total else 0.0,
         max_gust_km_h=max_gust,
