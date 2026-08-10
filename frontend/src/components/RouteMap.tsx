@@ -1,87 +1,120 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import type { Segment } from '../types'
+import type { Analysis, Segment } from '../types'
+import { distanceAtTime, positionAtDistance, slotIndexAt, windOnRoute } from '../field'
 import {
   ALIGNMENT_COLOUR,
   ALIGNMENT_LABEL,
   RAIN_COLOUR,
   RAIN_LABEL,
-  RAIN_WIDTH,
   arrowRotation,
   formatTime,
   isNotable,
   segmentColour,
 } from '../wind'
+import { RainOverlay } from './RainOverlay'
+import { TimeSlider } from './TimeSlider'
+import { WindArrows } from './WindArrows'
 
 interface Props {
-  segments: Segment[]
+  analysis: Analysis
 }
 
-export function RouteMap({ segments }: Props) {
-  const wet = segments.some((segment) => segment.rain_tier !== null)
+export function RouteMap({ analysis }: Props) {
+  const { field, segments, route } = analysis
+
+  const rideStart = firstTime(segments)
+  const rideEnd = lastTime(segments)
+
+  const [slot, setSlot] = useState(0)
+  const [playing, setPlaying] = useState(false)
+
+  // Start on the departure time, and follow it when a new route is analysed.
+  useEffect(() => {
+    setPlaying(false)
+    setSlot(field && rideStart ? slotIndexAt(field, rideStart) : 0)
+  }, [field, rideStart?.getTime()])
+
+  const shownTime = field ? new Date(field.slots[slot] * 1000) : null
+  const riderPosition = useMemo(() => {
+    if (!shownTime) return null
+    const km = distanceAtTime(segments, shownTime)
+    return km === null ? null : positionAtDistance(route, km)
+  }, [route, segments, shownTime?.getTime()])
+
+  const atRideTime = Boolean(
+    shownTime && rideStart && rideEnd && shownTime >= rideStart && shownTime <= rideEnd,
+  )
 
   return (
     <div className="relative h-full w-full">
-      <MapContainer
-        center={[48.14, 11.58]}
-        zoom={11}
-        scrollWheelZoom
-        className="h-full w-full"
-      >
+      <MapContainer center={[48.14, 11.58]} zoom={11} scrollWheelZoom className="h-full w-full">
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
 
-        {/* Rain first, so it sits underneath the wind-coloured route. */}
-        {segments.map((segment, index) =>
-          segment.rain_tier ? (
-            <Polyline
-              key={`rain-${index}`}
-              positions={segment.coordinates}
-              pathOptions={{
-                color: RAIN_COLOUR[segment.rain_tier],
-                weight: RAIN_WIDTH[segment.rain_tier],
-                opacity: 0.45,
-                lineCap: 'round',
-              }}
-            />
-          ) : null,
-        )}
+        {field && <RainOverlay field={field} slot={slot} />}
+        {field && <WindArrows field={field} slot={slot} />}
 
         {segments.map((segment, index) => (
           <Polyline
             key={`line-${index}`}
             positions={segment.coordinates}
             pathOptions={{
-              color: segmentColour(segment),
+              color: colourAt(analysis, segment, slot),
               weight: 6,
-              opacity: 0.9,
+              opacity: 0.92,
               dashArray: segment.unsafe ? '10 8' : undefined,
             }}
           />
         ))}
 
         {segments.map((segment, index) => (
-          <Marker key={`arrow-${index}`} position={segment.point} icon={windIcon(segment)}>
+          <Marker key={`arrow-${index}`} position={segment.point} icon={pinIcon(segment)}>
             <Popup>
               <SegmentPopup segment={segment} />
             </Popup>
           </Marker>
         ))}
 
+        {riderPosition && <Marker position={riderPosition} icon={riderIcon(atRideTime)} />}
+
         <FitToRoute segments={segments} />
       </MapContainer>
 
-      <Legend showRain={wet} />
+      <Legend />
+
+      {field && field.slots.length > 1 && (
+        <TimeSlider
+          field={field}
+          slot={slot}
+          onSlotChange={setSlot}
+          playing={playing}
+          onPlayingChange={setPlaying}
+          rideStart={rideStart}
+          rideEnd={rideEnd}
+        />
+      )}
     </div>
   )
 }
 
-function Legend({ showRain }: { showRain: boolean }) {
+/** Colour a stretch by the wind at the displayed time, not at arrival. */
+function colourAt(analysis: Analysis, segment: Segment, slot: number): string {
+  if (!analysis.field) return segmentColour(segment)
+
+  const [lat, lon] = segment.point
+  const wind = windOnRoute(analysis.field, lat, lon, slot, segment.bearing_deg)
+
+  if (Math.max(Math.abs(wind.headwindKmH), wind.crosswindKmH) < 12) return '#94a3b8'
+  return ALIGNMENT_COLOUR[wind.alignment]
+}
+
+function Legend() {
   return (
-    <div className="pointer-events-none absolute bottom-6 left-4 z-1000 rounded-box border border-base-300/60 bg-base-100/92 px-3.5 py-2.5 text-xs shadow-lg backdrop-blur-sm">
+    <div className="pointer-events-none absolute top-3 right-3 z-1000 rounded-box border border-base-300/60 bg-base-100/92 px-3.5 py-2.5 text-xs shadow-lg backdrop-blur-sm">
       <p className="mb-1.5 font-medium opacity-55">Wind auf der Route</p>
       <ul className="space-y-1">
         {(['headwind', 'crosswind', 'tailwind'] as const).map((alignment) => (
@@ -99,22 +132,16 @@ function Legend({ showRain }: { showRain: boolean }) {
         </li>
       </ul>
 
-      {showRain && (
-        <>
-          <p className="mt-2.5 mb-1.5 font-medium opacity-55">Niederschlag</p>
-          <ul className="space-y-1">
-            {(['light', 'moderate', 'heavy'] as const).map((tier) => (
-              <li key={tier} className="flex items-center gap-2">
-                <span
-                  className="h-2.5 w-6 rounded-full"
-                  style={{ background: RAIN_COLOUR[tier], opacity: 0.55 }}
-                />
-                {RAIN_LABEL[tier]}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <p className="mt-2.5 mb-1.5 font-medium opacity-55">Niederschlag</p>
+      <div className="flex items-center gap-1.5">
+        <span
+          className="h-2.5 w-16 rounded-full"
+          style={{
+            background: `linear-gradient(90deg, ${RAIN_COLOUR.light}, ${RAIN_COLOUR.moderate}, ${RAIN_COLOUR.heavy})`,
+          }}
+        />
+        <span className="opacity-60">leicht → stark</span>
+      </div>
     </div>
   )
 }
@@ -124,7 +151,7 @@ function SegmentPopup({ segment }: { segment: Segment }) {
     <div className="min-w-52 text-sm">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <span className="font-semibold">{formatTime(segment.time)}</span>
-        <span className="opacity-55">{segment.distance_km.toFixed(1)} km</span>
+        <span className="opacity-55">bei km {segment.mid_distance_km.toFixed(1)}</span>
       </div>
 
       <dl className="space-y-1">
@@ -137,16 +164,16 @@ function SegmentPopup({ segment }: { segment: Segment }) {
         <Row label="Böen" value={`${segment.wind_gusts_km_h.toFixed(0)} km/h`} />
         <Row
           label="Regen"
-          value={
-            segment.rain_tier ? `${segment.precipitation_mm_h.toFixed(1)} mm/h` : 'trocken'
-          }
+          value={segment.rain_tier ? `${segment.precipitation_mm_h.toFixed(1)} mm/h` : 'trocken'}
           accent={segment.rain_tier ? RAIN_COLOUR[segment.rain_tier] : undefined}
           note={segment.rain_tier ? RAIN_LABEL[segment.rain_tier] : undefined}
         />
       </dl>
 
+      <p className="mt-2 text-[11px] opacity-45">Werte für deine geschätzte Ankunft hier.</p>
+
       {segment.unsafe && (
-        <p className="mt-2 rounded-md bg-error/15 px-2 py-1 text-xs font-medium text-error">
+        <p className="mt-1.5 rounded-md bg-error/15 px-2 py-1 text-xs font-medium text-error">
           Kritische Bedingungen
         </p>
       )}
@@ -186,40 +213,60 @@ function FitToRoute({ segments }: { segments: Segment[] }) {
   }, [segments])
 
   useEffect(() => {
-    if (bounds) {
-      map.fitBounds(bounds, { padding: [40, 40] })
-    }
+    if (bounds) map.fitBounds(bounds, { padding: [40, 60] })
   }, [bounds, map])
 
   return null
 }
 
-/** An arrow pointing where the wind is blowing, labelled with its speed. */
-function windIcon(segment: Segment): L.DivIcon {
+/** A small marker at each forecast point along the route. */
+function pinIcon(segment: Segment): L.DivIcon {
   const colour = isNotable(segment) ? ALIGNMENT_COLOUR[segment.alignment] : '#64748b'
   const rotation = arrowRotation(segment.wind_direction_deg)
-  const drop = segment.rain_tier
-    ? `<span style="color:${RAIN_COLOUR[segment.rain_tier]};font-size:9px;">&#9679;</span>`
-    : ''
 
   return L.divIcon({
     className: '',
-    iconSize: [46, 46],
-    iconAnchor: [23, 23],
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
     html: `
-      <div style="display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px;">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
-             style="transform:rotate(${rotation}deg);filter:drop-shadow(0 1px 2px oklch(0% 0 0 / .3))">
-          <path d="M12 3 L12 21 M12 3 L7 9 M12 3 L17 9"
-                stroke="${colour}" stroke-width="3.2"
-                stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span style="font-size:10px;font-weight:600;color:${colour};
-                     background:color-mix(in oklch, var(--color-base-100) 85%, transparent);
-                     border-radius:4px;padding:1px 4px;white-space:nowrap;
-                     box-shadow:0 1px 3px oklch(0% 0 0 / .18);">
-          ${segment.wind_speed_km_h.toFixed(0)}${drop}
-        </span>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+           style="transform:rotate(${rotation}deg);filter:drop-shadow(0 1px 2px oklch(0% 0 0 / .35))">
+        <circle cx="12" cy="12" r="10" fill="var(--color-base-100)" opacity="0.9"/>
+        <path d="M12 5.5 L12 18 M12 5.5 L8.5 10 M12 5.5 L15.5 10"
+              stroke="${colour}" stroke-width="2.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`,
+  })
+}
+
+/** Where the rider would be at the displayed time. */
+function riderIcon(onRoute: boolean): L.DivIcon {
+  const size = 30
+  return L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    html: `
+      <div style="display:grid;place-items:center;width:${size}px;height:${size}px;
+                  opacity:${onRoute ? 1 : 0.35};transition:opacity .2s;">
+        <span style="position:absolute;width:${size}px;height:${size}px;border-radius:9999px;
+                     background:var(--color-primary);opacity:.22;"></span>
+        <span style="width:13px;height:13px;border-radius:9999px;
+                     background:var(--color-primary);
+                     border:2.5px solid var(--color-base-100);
+                     box-shadow:0 1px 4px oklch(0% 0 0 / .4);"></span>
       </div>`,
   })
+}
+
+function firstTime(segments: Segment[]): Date | null {
+  const found = segments.find((segment) => segment.time)
+  return found?.time ? new Date(found.time) : null
+}
+
+function lastTime(segments: Segment[]): Date | null {
+  for (let i = segments.length - 1; i >= 0; i -= 1) {
+    if (segments[i].time) return new Date(segments[i].time as string)
+  }
+  return null
 }

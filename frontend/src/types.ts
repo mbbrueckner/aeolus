@@ -6,6 +6,8 @@ export interface Segment {
   point: [number, number]
   time: string | null
   distance_km: number
+  start_distance_km: number
+  mid_distance_km: number
   bearing_deg: number
   wind_speed_km_h: number
   wind_direction_deg: number
@@ -41,9 +43,22 @@ export interface Summary {
   arrival: string | null
 }
 
+/** Forecast weather on a grid over time, shaped [row][column][slot]. */
+export interface Field {
+  latitudes: number[]
+  longitudes: number[]
+  slots: number[]
+  precipitation_mm_h: number[][][]
+  wind_u_m_s: number[][][]
+  wind_v_m_s: number[][][]
+  wind_gusts_m_s: number[][][]
+}
+
 export interface Analysis {
+  route: [number, number][]
   summary: Summary
   segments: Segment[]
+  field: Field | null
 }
 
 export interface AnalyseRequest {

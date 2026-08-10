@@ -21,11 +21,14 @@ __version__ = "1.0.0"
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.analyzer import RouteAnalysis, analyze_route
 from app.services.summary import rain_tier
+from app.services.weather_field import WeatherField, fetch_field, route_bounds
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MIN_SPEED_KMH = 5.0
@@ -34,6 +37,9 @@ MAX_SPEED_KMH = 60.0
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 app = FastAPI(title="Aeolus", description="Weather along your route")
+
+# The weather field is a few hundred kilobytes of numbers and compresses well.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 @app.post("/api/analyze")
@@ -84,7 +90,59 @@ async def analyze(
     if not analysis.snapshots:
         raise HTTPException(422, "the GPX file contains no usable track")
 
-    return _to_payload(analysis)
+    payload = _to_payload(analysis)
+    payload["field"] = _fetch_field_for(analysis)
+    return payload
+
+
+def _fetch_field_for(analysis: RouteAnalysis) -> dict | None:
+    """Fetch the weather field covering the route, if the forecast reaches it.
+
+    A missing field only costs the map its overlay, so a failure here must not
+    take the route analysis down with it.
+
+    Args:
+        analysis: The scored route.
+
+    Returns:
+        The field as plain types, or None if it could not be fetched.
+    """
+    points = [s.cluster.representative_point for s in analysis.snapshots]
+    first = analysis.snapshots[0].timestamp
+    last = analysis.snapshots[-1].timestamp
+
+    try:
+        field = fetch_field(route_bounds(points), first.date(), last.date())
+    except Exception:
+        return None
+
+    return _field_payload(field)
+
+
+def _field_payload(field: WeatherField) -> dict:
+    """Round the field for transport.
+
+    One decimal is well inside the forecast's own uncertainty and keeps the
+    payload a fraction of the size.
+
+    Args:
+        field: The weather field.
+
+    Returns:
+        Nested lists of plain floats.
+    """
+    def rounded(values: np.ndarray, decimals: int = 1) -> list:
+        return np.round(values, decimals).tolist()
+
+    return {
+        "latitudes": field.latitudes,
+        "longitudes": field.longitudes,
+        "slots": field.slots,
+        "precipitation_mm_h": rounded(field.precipitation_mm_h, 2),
+        "wind_u_m_s": rounded(field.wind_u_m_s),
+        "wind_v_m_s": rounded(field.wind_v_m_s),
+        "wind_gusts_m_s": rounded(field.wind_gusts_m_s),
+    }
 
 
 def _to_payload(analysis: RouteAnalysis) -> dict:
@@ -98,7 +156,20 @@ def _to_payload(analysis: RouteAnalysis) -> dict:
     """
     summary = analysis.summary
 
+    # Cumulative distance lets the front end place the rider along the route
+    # for any point in time, rather than only at cluster midpoints.
+    covered_m = 0.0
+    start_distances: list[float] = []
+    for snapshot in analysis.snapshots:
+        start_distances.append(covered_m)
+        covered_m += snapshot.cluster.total_distance_m
+
     return {
+        "route": [
+            point
+            for snapshot in analysis.snapshots
+            for point in _coordinates(snapshot)
+        ],
         "summary": {
             "total_distance_km": summary.total_distance_m / 1000.0,
             "headwind_km": summary.headwind_distance_m / 1000.0,
@@ -131,6 +202,8 @@ def _to_payload(analysis: RouteAnalysis) -> dict:
                 ],
                 "time": _isoformat(snapshot.timestamp),
                 "distance_km": snapshot.cluster.total_distance_m / 1000.0,
+                "start_distance_km": start_km,
+                "mid_distance_km": start_km + snapshot.cluster.total_distance_m / 2000.0,
                 "bearing_deg": snapshot.cluster.mean_bearing,
                 "wind_speed_km_h": snapshot.wind_speed_km_h,
                 "wind_direction_deg": snapshot.wind_direction_deg,
@@ -143,7 +216,9 @@ def _to_payload(analysis: RouteAnalysis) -> dict:
                 "score": score.score,
                 "unsafe": score.unsafe,
             }
-            for snapshot, score in zip(analysis.snapshots, analysis.scores)
+            for snapshot, score, start_km in zip(
+                analysis.snapshots, analysis.scores, [d / 1000.0 for d in start_distances]
+            )
         ],
     }
 

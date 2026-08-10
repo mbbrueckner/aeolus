@@ -72,7 +72,7 @@ export default function App() {
       </aside>
 
       <main className="relative min-h-[55vh] flex-1">
-        {analysis ? <RouteMap segments={analysis.segments} /> : <EmptyState busy={busy} />}
+        {analysis ? <RouteMap analysis={analysis} /> : <EmptyState busy={busy} />}
       </main>
     </div>
   )

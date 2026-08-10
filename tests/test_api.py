@@ -28,8 +28,11 @@ def analysis_of(snapshots) -> RouteAnalysis:
     return RouteAnalysis(snapshots=snapshots, scores=scores, summary=summarise(snapshots, scores))
 
 
-def post(analysis: RouteAnalysis | None = None, **overrides):
-    """Call the endpoint with a stubbed analysis and sensible defaults."""
+def post(analysis: RouteAnalysis | None = None, field=None, **overrides):
+    """Call the endpoint with a stubbed analysis and sensible defaults.
+
+    The weather field is stubbed too, so the suite never touches the network.
+    """
     data = {
         "avg_speed_kmh": "22",
         "start_time": "2026-08-12T14:00",
@@ -37,10 +40,16 @@ def post(analysis: RouteAnalysis | None = None, **overrides):
     }
     files = {"gpx": ("route.gpx", io.BytesIO(data.pop("gpx_bytes", GPX)), "application/gpx+xml")}
 
-    if analysis is None:
-        return client.post("/api/analyze", data=data, files=files)
-    with patch("app.web.api.analyze_route", return_value=analysis):
-        return client.post("/api/analyze", data=data, files=files)
+    with patch("app.web.api.fetch_field", side_effect=field or _no_field):
+        if analysis is None:
+            return client.post("/api/analyze", data=data, files=files)
+        with patch("app.web.api.analyze_route", return_value=analysis):
+            return client.post("/api/analyze", data=data, files=files)
+
+
+def _no_field(*args, **kwargs):
+    """Stand in for an unreachable forecast field."""
+    raise RuntimeError("field unavailable")
 
 
 # ── Input validation ──────────────────────────────────────────────
@@ -146,3 +155,72 @@ def test_peak_precipitation_is_reported():
         make_snapshot(precipitation_mm_15=3.0),
     ]))
     assert response.json()["summary"]["max_precipitation_mm_h"] == 12.0
+
+
+# ── Weather field ─────────────────────────────────────────────────
+
+def stub_field(*_args, **_kwargs):
+    """A tiny two-by-two field with one slot."""
+    import numpy as np
+    from app.services.weather_field import WeatherField
+
+    ones = np.ones((2, 2, 1))
+    return WeatherField(
+        latitudes=[48.0, 48.2],
+        longitudes=[11.0, 11.3],
+        slots=[1_770_000_000],
+        precipitation_mm_h=ones * 1.234,
+        wind_u_m_s=ones * 3.456,
+        wind_v_m_s=ones * -1.5,
+        wind_gusts_m_s=ones * 7.0,
+    )
+
+
+def test_field_is_included_when_available():
+    response = post(analysis_of([make_snapshot()]), field=stub_field)
+    field = response.json()["field"]
+
+    assert field["latitudes"] == [48.0, 48.2]
+    assert field["slots"] == [1_770_000_000]
+
+def test_field_arrays_are_shaped_rows_columns_slots():
+    response = post(analysis_of([make_snapshot()]), field=stub_field)
+    grid = response.json()["field"]["precipitation_mm_h"]
+
+    assert len(grid) == 2
+    assert len(grid[0]) == 2
+    assert len(grid[0][0]) == 1
+
+def test_field_values_are_rounded_for_transport():
+    response = post(analysis_of([make_snapshot()]), field=stub_field)
+    field = response.json()["field"]
+
+    assert field["precipitation_mm_h"][0][0][0] == 1.23
+    assert field["wind_u_m_s"][0][0][0] == 3.5
+
+def test_route_still_analyses_when_the_field_fails():
+    """Losing the overlay must not cost the whole answer."""
+    response = post(analysis_of([make_snapshot()]))
+
+    assert response.status_code == 200
+    assert response.json()["field"] is None
+    assert response.json()["segments"]
+
+
+# ── Route geometry ────────────────────────────────────────────────
+
+def test_route_polyline_is_returned():
+    response = post(analysis_of([make_snapshot()]), field=stub_field)
+    assert response.json()["route"]
+
+def test_segments_carry_their_position_along_the_route():
+    response = post(analysis_of([
+        make_snapshot(distance_m=2000.0),
+        make_snapshot(distance_m=4000.0),
+    ]), field=stub_field)
+    segments = response.json()["segments"]
+
+    assert segments[0]["start_distance_km"] == 0.0
+    assert segments[0]["mid_distance_km"] == 1.0
+    assert segments[1]["start_distance_km"] == 2.0
+    assert segments[1]["mid_distance_km"] == 4.0
