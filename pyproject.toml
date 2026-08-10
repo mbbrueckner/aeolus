@@ -25,6 +25,11 @@ notebook = [
 analysis = [
     "garmin-fit-sdk>=21.212.0",
 ]
+web = [
+    "fastapi>=0.141.1",
+    "python-multipart>=0.0.32",
+    "uvicorn>=0.52.1",
+]
 
 [dependency-groups]
 dev = [

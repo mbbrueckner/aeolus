@@ -35,6 +35,13 @@ venv/
 .vscode/*
 .idea/
 
+# Frontend
+node_modules/
+frontend/dist/
+
+# Cached weather archive responses
+.weather_cache/
+
 # Data files (may contain sensitive GPS data)
 data/
 

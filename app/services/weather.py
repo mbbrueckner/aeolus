@@ -96,10 +96,10 @@ def _parse_responses(
         snapshot = ClusterWeatherSnapshot(
             cluster=clusters[i],
             timestamp=arrival_times[i],
-            wind_speed_km_h=minutely.Variables(0).ValuesAsNumpy()[idx],
-            wind_direction_deg=minutely.Variables(1).ValuesAsNumpy()[idx],
-            wind_gusts_km_h=minutely.Variables(2).ValuesAsNumpy()[idx],
-            precipitation_mm_h=minutely.Variables(3).ValuesAsNumpy()[idx],
+            wind_speed_km_h=float(minutely.Variables(0).ValuesAsNumpy()[idx]),
+            wind_direction_deg=float(minutely.Variables(1).ValuesAsNumpy()[idx]),
+            wind_gusts_km_h=float(minutely.Variables(2).ValuesAsNumpy()[idx]),
+            precipitation_mm_h=float(minutely.Variables(3).ValuesAsNumpy()[idx]),
         )
         snapshots.append(snapshot)
 
