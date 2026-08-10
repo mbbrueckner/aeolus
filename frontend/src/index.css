@@ -1,9 +1,92 @@
 @import "tailwindcss";
+
+/* Only the two themes defined below ship; the stock set would be dead weight. */
 @plugin "daisyui" {
-  themes: winter --default, night --prefersdark;
+  themes: false;
 }
 
 @import "leaflet/dist/leaflet.css";
+
+/*
+ * Warm neutrals rather than the blue-grey of the stock themes, which read as
+ * clinical. The hue is held around 70 across every surface so the greys look
+ * like paper and ink instead of steel.
+ */
+@plugin "daisyui/theme" {
+  name: "aeolus-light";
+  default: true;
+  color-scheme: light;
+
+  --color-base-100: oklch(99% 0.004 85);
+  --color-base-200: oklch(96.5% 0.008 80);
+  --color-base-300: oklch(92% 0.012 78);
+  --color-base-content: oklch(28% 0.02 55);
+
+  --color-primary: oklch(55% 0.13 220);
+  --color-primary-content: oklch(98% 0.01 220);
+  --color-secondary: oklch(68% 0.11 55);
+  --color-secondary-content: oklch(25% 0.03 55);
+  --color-accent: oklch(72% 0.14 65);
+  --color-accent-content: oklch(25% 0.04 65);
+  --color-neutral: oklch(36% 0.02 60);
+  --color-neutral-content: oklch(96% 0.008 80);
+
+  --color-info: oklch(62% 0.11 230);
+  --color-info-content: oklch(98% 0.01 230);
+  --color-success: oklch(58% 0.13 150);
+  --color-success-content: oklch(98% 0.01 150);
+  --color-warning: oklch(72% 0.15 70);
+  --color-warning-content: oklch(25% 0.04 70);
+  --color-error: oklch(58% 0.18 25);
+  --color-error-content: oklch(98% 0.01 25);
+
+  --radius-selector: 0.75rem;
+  --radius-field: 0.7rem;
+  --radius-box: 1.1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.28rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "aeolus-dark";
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(24% 0.012 65);
+  --color-base-200: oklch(20.5% 0.012 65);
+  --color-base-300: oklch(30% 0.014 65);
+  --color-base-content: oklch(92% 0.012 80);
+
+  --color-primary: oklch(72% 0.12 220);
+  --color-primary-content: oklch(20% 0.02 220);
+  --color-secondary: oklch(72% 0.1 55);
+  --color-secondary-content: oklch(20% 0.03 55);
+  --color-accent: oklch(76% 0.13 65);
+  --color-accent-content: oklch(22% 0.04 65);
+  --color-neutral: oklch(34% 0.014 65);
+  --color-neutral-content: oklch(92% 0.012 80);
+
+  --color-info: oklch(72% 0.1 230);
+  --color-info-content: oklch(20% 0.02 230);
+  --color-success: oklch(70% 0.12 150);
+  --color-success-content: oklch(20% 0.02 150);
+  --color-warning: oklch(78% 0.13 70);
+  --color-warning-content: oklch(22% 0.04 70);
+  --color-error: oklch(68% 0.16 25);
+  --color-error-content: oklch(20% 0.02 25);
+
+  --radius-selector: 0.75rem;
+  --radius-field: 0.7rem;
+  --radius-box: 1.1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.28rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
 
 html,
 body,
@@ -11,18 +94,90 @@ body,
   height: 100%;
 }
 
-/* Leaflet paints its own tiles; keep the container from flashing white in dark mode. */
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Native date and file pickers ignore utility classes. color-scheme comes from
+ * the DaisyUI theme and makes the browser's own calendar match, and these rules
+ * bring the parts that do respond into line with the rest of the form.
+ */
+input[type="datetime-local"] {
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  padding: 0.15rem;
+  border-radius: 0.35rem;
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: color-mix(in oklch, var(--color-base-content) 12%, transparent);
+}
+
+input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+input[type="datetime-local"]::-webkit-datetime-edit-text {
+  opacity: 0.4;
+  padding: 0 0.1rem;
+}
+
+/* Leaflet paints its own tiles, so the container needs an explicit ground. */
 .leaflet-container {
   background: var(--color-base-200);
   font-family: inherit;
+  font-size: inherit;
 }
 
-.leaflet-popup-content-wrapper,
-.leaflet-popup-tip {
+.leaflet-popup-content-wrapper {
   background: var(--color-base-100);
   color: var(--color-base-content);
+  border-radius: var(--radius-box);
+  box-shadow: 0 12px 32px -12px oklch(0% 0 0 / 0.35);
+}
+
+.leaflet-popup-tip {
+  background: var(--color-base-100);
 }
 
 .leaflet-popup-content {
-  margin: 0.75rem 1rem;
+  margin: 0.85rem 1.05rem;
+}
+
+.leaflet-popup-close-button {
+  color: var(--color-base-content) !important;
+  opacity: 0.4;
+}
+
+.leaflet-bar a,
+.leaflet-control-attribution {
+  background: var(--color-base-100) !important;
+  color: var(--color-base-content) !important;
+  border-color: var(--color-base-300) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-primary) !important;
+}
+
+/* Dark map tiles: OpenStreetMap only ships a light raster set. */
+[data-theme="aeolus-dark"] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.75);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -139,16 +139,17 @@ function windIcon(segment: Segment): L.DivIcon {
     iconSize: [46, 46],
     iconAnchor: [23, 23],
     html: `
-      <div style="display:flex;flex-direction:column;align-items:center;line-height:1;">
+      <div style="display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px;">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
-             style="transform:rotate(${rotation}deg);filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">
+             style="transform:rotate(${rotation}deg);filter:drop-shadow(0 1px 2px oklch(0% 0 0 / .3))">
           <path d="M12 3 L12 21 M12 3 L7 9 M12 3 L17 9"
                 stroke="${colour}" stroke-width="3.2"
                 stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span style="font-size:10px;font-weight:600;color:${colour};
-                     background:rgba(255,255,255,.82);border-radius:3px;padding:0 3px;
-                     white-space:nowrap;">
+                     background:color-mix(in oklch, var(--color-base-100) 85%, transparent);
+                     border-radius:4px;padding:1px 4px;white-space:nowrap;
+                     box-shadow:0 1px 3px oklch(0% 0 0 / .18);">
           ${segment.wind_speed_km_h.toFixed(0)}${wet ? ' ☔' : ''}
         </span>
       </div>`,
