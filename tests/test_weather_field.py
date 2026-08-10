@@ -21,13 +21,19 @@ START_UNIX = 1_770_000_000 // SLOT_SECONDS * SLOT_SECONDS
 N_SLOTS = 96
 
 
-def fake_client(speed_m_s: float = 5.0, direction_deg: float = 270.0, rain_mm: float = 0.25):
+def fake_client(
+    speed_m_s: float = 5.0,
+    direction_deg: float = 270.0,
+    rain_mm: float = 0.25,
+    probability: float = 40.0,
+):
     """Build a stub client returning one uniform value per variable."""
     values = {
         "precipitation": rain_mm,
         "wind_speed_10m": speed_m_s,
         "wind_direction_10m": direction_deg,
         "wind_gusts_10m": speed_m_s * 1.5,
+        "precipitation_probability": probability,
     }
 
     def response_for(_):
@@ -167,3 +173,14 @@ def test_request_asks_for_metres_per_second():
     client = fake_client()
     fetch_field((48.0, 48.2, 11.0, 11.3), date(2026, 8, 12), client=client)
     assert client.weather_api.call_args.kwargs["params"]["wind_speed_unit"] == "ms"
+
+
+def test_probability_is_carried_through():
+    field = fetch_field(
+        (48.0, 48.2, 11.0, 11.3), date(2026, 8, 12), client=fake_client(probability=65.0)
+    )
+    assert np.allclose(field.precipitation_probability, 65.0)
+
+def test_probability_is_shaped_like_the_rest():
+    field = fetch_field((48.0, 48.2, 11.0, 11.3), date(2026, 8, 12), client=fake_client())
+    assert field.precipitation_probability.shape == field.precipitation_mm_h.shape

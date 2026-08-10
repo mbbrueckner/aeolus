@@ -35,6 +35,7 @@ FIELD_VARIABLES = [
     "wind_speed_10m",
     "wind_direction_10m",
     "wind_gusts_10m",
+    "precipitation_probability",
 ]
 
 
@@ -54,6 +55,9 @@ class WeatherField:
         wind_u_m_s: Eastward wind component, same shape.
         wind_v_m_s: Northward wind component, same shape.
         wind_gusts_m_s: Gust speed, same shape.
+        precipitation_probability: Chance of rain in percent, same shape. It
+            is what carries the growing uncertainty of a forecast further out,
+            which the rain rate alone hides.
     """
 
     latitudes: list[float]
@@ -63,6 +67,7 @@ class WeatherField:
     wind_u_m_s: np.ndarray
     wind_v_m_s: np.ndarray
     wind_gusts_m_s: np.ndarray
+    precipitation_probability: np.ndarray
 
     @property
     def shape(self) -> tuple[int, int, int]:
@@ -204,6 +209,7 @@ def _to_field(
         wind_u_m_s=speed * np.sin(blowing_towards),
         wind_v_m_s=speed * np.cos(blowing_towards),
         wind_gusts_m_s=reshape(stacked[3]),
+        precipitation_probability=reshape(stacked[4]),
     )
 
 

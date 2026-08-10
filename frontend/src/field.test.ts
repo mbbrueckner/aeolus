@@ -32,6 +32,7 @@ function makeField(
     wind_u_m_s: grid([wind.u, wind.u, wind.u, wind.u]),
     wind_v_m_s: grid([wind.v, wind.v, wind.v, wind.v]),
     wind_gusts_m_s: grid([0, 0, 0, 0]),
+    precipitation_probability: grid([0, 0, 0, 0]),
   }
 }
 

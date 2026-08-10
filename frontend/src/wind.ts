@@ -46,6 +46,7 @@ const NOTABLE_WIND_KM_H = 12
 
 /** Whether a segment's wind is strong enough to be worth showing as a direction. */
 export function isNotable(segment: Segment): boolean {
+  if (segment.tailwind_km_h === null || segment.crosswind_km_h === null) return false
   return (
     Math.abs(segment.tailwind_km_h) >= NOTABLE_WIND_KM_H ||
     segment.crosswind_km_h >= NOTABLE_WIND_KM_H
@@ -54,7 +55,8 @@ export function isNotable(segment: Segment): boolean {
 
 /** Colour for a segment's polyline, muted when the wind is unremarkable. */
 export function segmentColour(segment: Segment): string {
-  return isNotable(segment) ? ALIGNMENT_COLOUR[segment.alignment] : '#94a3b8'
+  if (!isNotable(segment) || !segment.alignment) return '#94a3b8'
+  return ALIGNMENT_COLOUR[segment.alignment]
 }
 
 /** Direction the wind blows towards, which is what an arrow should point at. */

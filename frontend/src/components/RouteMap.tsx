@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { Analysis, Segment } from '../types'
-import { distanceAtTime, positionAtDistance, slotIndexAt, windOnRoute } from '../field'
+import { distanceAtTime, positionAtDistance, windOnRoute } from '../field'
 import {
   ALIGNMENT_COLOUR,
   ALIGNMENT_LABEL,
@@ -19,23 +19,17 @@ import { WindArrows } from './WindArrows'
 
 interface Props {
   analysis: Analysis
+  slot: number
+  onSlotChange: (slot: number) => void
+  playing: boolean
+  onPlayingChange: (playing: boolean) => void
 }
 
-export function RouteMap({ analysis }: Props) {
+export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChange }: Props) {
   const { field, segments, route } = analysis
 
   const rideStart = firstTime(segments)
   const rideEnd = lastTime(segments)
-
-  const [slot, setSlot] = useState(0)
-  const [playing, setPlaying] = useState(false)
-
-  // Start on the departure time, and follow it when a new route is analysed.
-  useEffect(() => {
-    setPlaying(false)
-    setSlot(field && rideStart ? slotIndexAt(field, rideStart) : 0)
-  }, [field, rideStart?.getTime()])
-
   const shownTime = field ? new Date(field.slots[slot] * 1000) : null
   const riderPosition = useMemo(() => {
     if (!shownTime) return null
@@ -90,9 +84,9 @@ export function RouteMap({ analysis }: Props) {
         <TimeSlider
           field={field}
           slot={slot}
-          onSlotChange={setSlot}
+          onSlotChange={onSlotChange}
           playing={playing}
-          onPlayingChange={setPlaying}
+          onPlayingChange={onPlayingChange}
           rideStart={rideStart}
           rideEnd={rideEnd}
         />
@@ -150,27 +144,39 @@ function SegmentPopup({ segment }: { segment: Segment }) {
   return (
     <div className="min-w-52 text-sm">
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="font-semibold">{formatTime(segment.time)}</span>
-        <span className="opacity-55">bei km {segment.mid_distance_km.toFixed(1)}</span>
+        <span className="font-semibold">
+          {segment.time ? formatTime(segment.time) : `km ${segment.mid_distance_km.toFixed(1)}`}
+        </span>
+        <span className="opacity-55">
+          {segment.time ? `bei km ${segment.mid_distance_km.toFixed(1)}` : 'Streckenabschnitt'}
+        </span>
       </div>
 
-      <dl className="space-y-1">
-        <Row
-          label="Wind"
-          value={`${segment.wind_speed_km_h.toFixed(0)} km/h`}
-          accent={isNotable(segment) ? ALIGNMENT_COLOUR[segment.alignment] : undefined}
-          note={isNotable(segment) ? ALIGNMENT_LABEL[segment.alignment] : 'schwach'}
-        />
-        <Row label="Böen" value={`${segment.wind_gusts_km_h.toFixed(0)} km/h`} />
-        <Row
-          label="Regen"
-          value={segment.rain_tier ? `${segment.precipitation_mm_h.toFixed(1)} mm/h` : 'trocken'}
-          accent={segment.rain_tier ? RAIN_COLOUR[segment.rain_tier] : undefined}
-          note={segment.rain_tier ? RAIN_LABEL[segment.rain_tier] : undefined}
-        />
-      </dl>
-
-      <p className="mt-2 text-[11px] opacity-45">Werte für deine geschätzte Ankunft hier.</p>
+      {segment.wind_speed_km_h === null ? (
+        <p className="text-xs leading-relaxed opacity-55">
+          Gib Abfahrtszeit und Schnitt an, um zu sehen, was dich hier erwartet. Die Karte
+          zeigt derweil das Wetter zur eingestellten Uhrzeit.
+        </p>
+      ) : (
+        <>
+          <dl className="space-y-1">
+            <Row
+              label="Wind"
+              value={`${segment.wind_speed_km_h.toFixed(0)} km/h`}
+              accent={isNotable(segment) && segment.alignment ? ALIGNMENT_COLOUR[segment.alignment] : undefined}
+              note={isNotable(segment) && segment.alignment ? ALIGNMENT_LABEL[segment.alignment] : 'schwach'}
+            />
+            <Row label="Böen" value={`${(segment.wind_gusts_km_h ?? 0).toFixed(0)} km/h`} />
+            <Row
+              label="Regen"
+              value={segment.rain_tier ? `${(segment.precipitation_mm_h ?? 0).toFixed(1)} mm/h` : 'trocken'}
+              accent={segment.rain_tier ? RAIN_COLOUR[segment.rain_tier] : undefined}
+              note={segment.rain_tier ? RAIN_LABEL[segment.rain_tier] : undefined}
+            />
+          </dl>
+          <p className="mt-2 text-[11px] opacity-45">Werte für deine geschätzte Ankunft hier.</p>
+        </>
+      )}
 
       {segment.unsafe && (
         <p className="mt-1.5 rounded-md bg-error/15 px-2 py-1 text-xs font-medium text-error">
@@ -221,8 +227,9 @@ function FitToRoute({ segments }: { segments: Segment[] }) {
 
 /** A small marker at each forecast point along the route. */
 function pinIcon(segment: Segment): L.DivIcon {
-  const colour = isNotable(segment) ? ALIGNMENT_COLOUR[segment.alignment] : '#64748b'
-  const rotation = arrowRotation(segment.wind_direction_deg)
+  const colour =
+    isNotable(segment) && segment.alignment ? ALIGNMENT_COLOUR[segment.alignment] : '#64748b'
+  const rotation = arrowRotation(segment.wind_direction_deg ?? 0)
 
   return L.divIcon({
     className: '',

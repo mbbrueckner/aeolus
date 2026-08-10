@@ -183,6 +183,7 @@ def stub_field(*_args, **_kwargs):
         wind_u_m_s=ones * 3.456,
         wind_v_m_s=ones * -1.5,
         wind_gusts_m_s=ones * 7.0,
+        precipitation_probability=ones * 55.0,
     )
 
 
@@ -286,3 +287,43 @@ def test_geometry_falls_back_when_no_track_is_available():
     response = post(analysis_of([snapshot]), field=stub_field)
 
     assert len(response.json()["segments"][0]["coordinates"]) == 2
+
+
+# ── Optional ride details ─────────────────────────────────────────
+
+def post_without_ride(**overrides):
+    """Upload a route without saying when or how fast it will be ridden."""
+    data = {**overrides}
+    files = {"gpx": ("route.gpx", io.BytesIO(GPX), "application/gpx+xml")}
+    with patch("app.web.api.fetch_field", side_effect=stub_field):
+        return client.post("/api/analyze", data=data, files=files)
+
+
+def test_route_alone_is_enough():
+    response = post_without_ride()
+    assert response.status_code == 200
+    assert response.json()["segments"]
+
+def test_route_alone_still_carries_the_field():
+    assert post_without_ride().json()["field"] is not None
+
+def test_route_alone_has_no_summary():
+    assert post_without_ride().json()["summary"] is None
+
+def test_route_alone_has_geometry_but_no_arrival_weather():
+    segment = post_without_ride().json()["segments"][0]
+
+    assert segment["coordinates"]
+    assert segment["bearing_deg"] is not None
+    assert segment["time"] is None
+    assert segment["wind_speed_km_h"] is None
+
+def test_a_time_without_a_speed_is_still_route_only():
+    """Both are needed to place the rider, so one alone changes nothing."""
+    assert post_without_ride(start_time="2026-08-12T14:00").json()["summary"] is None
+
+def test_a_speed_without_a_time_is_still_route_only():
+    assert post_without_ride(avg_speed_kmh="22").json()["summary"] is None
+
+def test_an_implausible_speed_is_rejected_even_without_a_time():
+    assert post_without_ride(avg_speed_kmh="99").status_code == 422

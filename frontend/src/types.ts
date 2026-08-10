@@ -9,15 +9,16 @@ export interface Segment {
   start_distance_km: number
   mid_distance_km: number
   bearing_deg: number
-  wind_speed_km_h: number
-  wind_direction_deg: number
-  wind_gusts_km_h: number
-  precipitation_mm_h: number
+  // Filled only when a departure time and speed were given.
+  wind_speed_km_h: number | null
+  wind_direction_deg: number | null
+  wind_gusts_km_h: number | null
+  precipitation_mm_h: number | null
   rain_tier: RainTier | null
-  alignment: Alignment
-  tailwind_km_h: number
-  crosswind_km_h: number
-  score: number
+  alignment: Alignment | null
+  tailwind_km_h: number | null
+  crosswind_km_h: number | null
+  score: number | null
   unsafe: boolean
 }
 
@@ -52,17 +53,18 @@ export interface Field {
   wind_u_m_s: number[][][]
   wind_v_m_s: number[][][]
   wind_gusts_m_s: number[][][]
+  precipitation_probability: number[][][]
 }
 
 export interface Analysis {
   route: [number, number][]
-  summary: Summary
+  summary: Summary | null
   segments: Segment[]
   field: Field | null
 }
 
 export interface AnalyseRequest {
   gpx: File
-  avgSpeedKmh: number
-  startTime: string
+  avgSpeedKmh?: number
+  startTime?: string
 }

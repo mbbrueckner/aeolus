@@ -8,8 +8,8 @@ export async function analyseRoute({
 }: AnalyseRequest): Promise<Analysis> {
   const body = new FormData()
   body.append('gpx', gpx)
-  body.append('avg_speed_kmh', String(avgSpeedKmh))
-  body.append('start_time', startTime)
+  if (avgSpeedKmh !== undefined) body.append('avg_speed_kmh', String(avgSpeedKmh))
+  if (startTime !== undefined) body.append('start_time', startTime)
 
   const response = await fetch('/api/analyze', { method: 'POST', body })
 

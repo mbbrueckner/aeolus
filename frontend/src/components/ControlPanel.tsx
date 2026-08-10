@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 
 interface Props {
   busy: boolean
-  onSubmit: (gpx: File, avgSpeedKmh: number, startTime: string) => void
+  onSubmit: (gpx: File, ride: { avgSpeedKmh: number; startTime: string } | null) => void
 }
 
 /** Local wall-clock time in the format a datetime-local input expects. */
@@ -14,23 +14,24 @@ function nowForInput(): string {
 
 export function ControlPanel({ busy, onSubmit }: Props) {
   const [file, setFile] = useState<File | null>(null)
+  const [planRide, setPlanRide] = useState(false)
   const [speed, setSpeed] = useState(22)
   const [start, setStart] = useState(nowForInput)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   function accept(dropped: File | null | undefined) {
-    if (dropped && dropped.name.toLowerCase().endsWith('.gpx')) {
-      setFile(dropped)
-    }
+    if (dropped && dropped.name.toLowerCase().endsWith('.gpx')) setFile(dropped)
   }
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault()
-        if (file) onSubmit(file, speed, start)
+        if (file) {
+          onSubmit(file, planRide ? { avgSpeedKmh: speed, startTime: start } : null)
+        }
       }}
     >
       <div
@@ -90,63 +91,60 @@ export function ControlPanel({ busy, onSubmit }: Props) {
         )}
       </div>
 
-      <Field label="Abfahrt">
-        <input
-          type="datetime-local"
-          required
-          value={start}
-          className="input w-full"
-          onChange={(event) => setStart(event.target.value)}
-        />
-      </Field>
-
-      <Field
-        label="Schnitt"
-        hint={
-          <span className="tabular-nums">
-            {speed.toFixed(1)} <span className="opacity-50">km/h</span>
+      <div className="rounded-box border border-base-300/60">
+        <label className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5">
+          <input
+            type="checkbox"
+            checked={planRide}
+            onChange={(event) => setPlanRide(event.target.checked)}
+            className="toggle toggle-primary toggle-sm"
+          />
+          <span className="flex-1">
+            <span className="block text-sm font-medium">Konkrete Fahrt planen</span>
+            <span className="block text-xs opacity-50">
+              {planRide
+                ? 'Zeigt zusätzlich, was dich wo erwartet'
+                : 'Ohne das siehst du nur die Wetterkarte der Route'}
+            </span>
           </span>
-        }
-      >
-        <input
-          type="range"
-          min={10}
-          max={45}
-          step={0.5}
-          value={speed}
-          className="range range-primary range-xs"
-          onChange={(event) => setSpeed(Number(event.target.value))}
-        />
-        <div className="mt-1 flex justify-between px-0.5 text-[10px] opacity-35">
-          <span>10</span>
-          <span>45</span>
-        </div>
-      </Field>
+        </label>
+
+        {planRide && (
+          <div className="space-y-4 border-t border-base-300/60 px-3.5 py-3.5">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium opacity-75">Abfahrt</span>
+              <input
+                type="datetime-local"
+                required
+                value={start}
+                className="input input-sm w-full"
+                onChange={(event) => setStart(event.target.value)}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 flex items-baseline justify-between text-sm font-medium">
+                <span className="opacity-75">Schnitt</span>
+                <span className="tabular-nums opacity-60">{speed.toFixed(1)} km/h</span>
+              </span>
+              <input
+                type="range"
+                min={10}
+                max={45}
+                step={0.5}
+                value={speed}
+                className="range range-primary range-xs"
+                onChange={(event) => setSpeed(Number(event.target.value))}
+              />
+            </label>
+          </div>
+        )}
+      </div>
 
       <button type="submit" className="btn btn-primary w-full" disabled={!file || busy}>
         {busy && <span className="loading loading-spinner loading-sm" />}
-        {busy ? 'Vorhersage wird geholt …' : 'Route auswerten'}
+        {busy ? 'Vorhersage wird geholt …' : 'Route anzeigen'}
       </button>
     </form>
-  )
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string
-  hint?: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 flex items-baseline justify-between text-sm font-medium">
-        <span className="opacity-75">{label}</span>
-        {hint}
-      </span>
-      {children}
-    </label>
   )
 }

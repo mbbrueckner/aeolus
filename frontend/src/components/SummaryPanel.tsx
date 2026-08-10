@@ -1,68 +1,89 @@
+import type { LiveSummary } from '../field'
 import type { RainTier, Summary } from '../types'
 import { ALIGNMENT_COLOUR, RAIN_COLOUR, RAIN_LABEL, formatKm, formatTime } from '../wind'
 
 interface Props {
-  summary: Summary
+  live: LiveSummary | null
+  shownTime: Date | null
+  summary: Summary | null
 }
 
-export function SummaryPanel({ summary }: Props) {
-  const calmKm = Math.max(
-    0,
-    summary.total_distance_km -
-      summary.headwind_km -
-      summary.tailwind_km -
-      summary.crosswind_km,
-  )
-
+export function SummaryPanel({ live, shownTime, summary }: Props) {
   return (
-    <section className="space-y-5">
+    <div className="space-y-5">
+      {live && <AtThisMoment live={live} shownTime={shownTime} />}
+      {summary && <OnYourRide summary={summary} />}
+    </div>
+  )
+}
+
+/** The whole route as it stands at the moment shown on the map. */
+function AtThisMoment({ live, shownTime }: { live: LiveSummary; shownTime: Date | null }) {
+  return (
+    <section className="space-y-3">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">Auf deiner Route</h2>
+        <h2 className="text-sm font-semibold">Auf der Route</h2>
         <span className="text-xs opacity-50">
-          {formatKm(summary.total_distance_km)} km · an {formatTime(summary.arrival)}
+          {shownTime
+            ? `um ${shownTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
+            : ''}{' '}
+          · {formatKm(live.totalKm)} km
         </span>
       </div>
 
       <div className="space-y-2.5">
-        <WindBar
-          label="Gegenwind"
-          km={summary.headwind_km}
-          total={summary.total_distance_km}
-          colour={ALIGNMENT_COLOUR.headwind}
-        />
-        <WindBar
-          label="Seitenwind"
-          km={summary.crosswind_km}
-          total={summary.total_distance_km}
-          colour={ALIGNMENT_COLOUR.crosswind}
-        />
-        <WindBar
-          label="Rückenwind"
-          km={summary.tailwind_km}
-          total={summary.total_distance_km}
-          colour={ALIGNMENT_COLOUR.tailwind}
-        />
-        <WindBar
-          label="kaum Wind"
-          km={calmKm}
-          total={summary.total_distance_km}
-          colour="currentColor"
-          muted
-        />
+        <Bar label="Gegenwind" km={live.headwindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.headwind} />
+        <Bar label="Seitenwind" km={live.crosswindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.crosswind} />
+        <Bar label="Rückenwind" km={live.tailwindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.tailwind} />
+        <Bar label="kaum Wind" km={live.calmKm} total={live.totalKm} colour="currentColor" muted />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
-        <Tile label="Wind im Mittel" value={summary.mean_wind_km_h.toFixed(0)} unit="km/h" />
-        <Tile label="stärkste Böe" value={summary.max_gust_km_h.toFixed(0)} unit="km/h" />
+        <Tile label="Wind im Mittel" value={live.meanWindKmH.toFixed(0)} unit="km/h" />
+        <Tile
+          label="Regenrisiko"
+          value={live.maxProbability.toFixed(0)}
+          unit="%"
+          muted={live.maxProbability < 15}
+        />
+      </div>
+
+      {live.rainKm > 0.05 ? (
+        <p className="rounded-box border border-info/25 bg-info/8 px-3.5 py-2.5 text-sm text-info">
+          Regen auf <strong>{formatKm(live.rainKm)} km</strong>, bis{' '}
+          {live.maxRainMmH.toFixed(1)} mm/h
+        </p>
+      ) : (
+        <p className="rounded-box border border-base-300/60 bg-base-200/40 px-3.5 py-2.5 text-sm opacity-60">
+          Gerade trocken auf der ganzen Route
+        </p>
+      )}
+    </section>
+  )
+}
+
+/** What the rider is expected to meet, given a departure time and speed. */
+function OnYourRide({ summary }: { summary: Summary }) {
+  return (
+    <section className="space-y-4 rounded-box border border-primary/25 bg-primary/5 px-3.5 py-3.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold text-primary">Auf deiner Fahrt</h2>
+        <span className="text-xs opacity-55">an {formatTime(summary.arrival)}</span>
+      </div>
+
+      <div className="space-y-2.5">
+        <Bar label="Gegenwind" km={summary.headwind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.headwind} />
+        <Bar label="Seitenwind" km={summary.crosswind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.crosswind} />
+        <Bar label="Rückenwind" km={summary.tailwind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.tailwind} />
       </div>
 
       <RainSection summary={summary} />
 
       {summary.unsafe_km > 0.1 && (
-        <Notice tone="error">
+        <p className="rounded-box border border-error/25 bg-error/10 px-3.5 py-2.5 text-sm text-error">
           Auf <strong>{formatKm(summary.unsafe_km)} km</strong> sind die Bedingungen
           kritisch — auf der Karte gestrichelt.
-        </Notice>
+        </p>
       )}
 
       <details className="group rounded-box bg-base-200/60">
@@ -88,8 +109,7 @@ export function SummaryPanel({ summary }: Props) {
         </summary>
         <p className="px-3.5 pb-3 text-xs leading-relaxed opacity-60">
           Eine zusammenfassende Zahl von −1 bis +1. Sie ist noch nicht gegen echte
-          Fahrten kalibriert — verlass dich lieber auf die Kilometer oben, die kannst du
-          nach der Fahrt überprüfen.
+          Fahrten kalibriert — verlass dich lieber auf die Kilometer oben.
         </p>
       </details>
     </section>
@@ -98,23 +118,7 @@ export function SummaryPanel({ summary }: Props) {
 
 function RainSection({ summary }: { summary: Summary }) {
   if (summary.rain_km <= 0.05) {
-    return (
-      <p className="flex items-center gap-2 rounded-box border border-base-300/60 bg-base-200/40 px-3.5 py-2.5 text-sm opacity-65">
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        >
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 3v1.5M12 19.5V21M4.5 4.5l1 1M18.5 18.5l1 1M3 12h1.5M19.5 12H21M4.5 19.5l1-1M18.5 5.5l1-1" />
-        </svg>
-        Durchgehend trocken
-      </p>
-    )
+    return <p className="text-sm opacity-60">Durchgehend trocken</p>
   }
 
   const tiers: { tier: RainTier; km: number }[] = [
@@ -124,22 +128,14 @@ function RainSection({ summary }: { summary: Summary }) {
   ]
 
   return (
-    <div className="space-y-2.5 rounded-box border border-info/25 bg-info/8 px-3.5 py-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold text-info">Niederschlag</h3>
-        <span className="text-xs opacity-60">
-          {formatKm(summary.rain_km)} km · {(summary.rain_share * 100).toFixed(0)} %
-        </span>
-      </div>
-
+    <div className="space-y-2 rounded-box border border-info/25 bg-info/10 px-3 py-2.5">
       {summary.rain_start_km !== null && (
         <p className="text-sm leading-snug">
-          Setzt ab <strong>km {formatKm(summary.rain_start_km)}</strong> ein
-          {summary.rain_start_time && <> , gegen {formatTime(summary.rain_start_time)} Uhr</>}.
+          Regen ab <strong>km {formatKm(summary.rain_start_km)}</strong>
+          {summary.rain_start_time && <>, gegen {formatTime(summary.rain_start_time)} Uhr</>}.
         </p>
       )}
-
-      <ul className="space-y-1.5">
+      <ul className="space-y-1">
         {tiers
           .filter(({ km }) => km > 0.05)
           .map(({ tier, km }) => (
@@ -156,15 +152,11 @@ function RainSection({ summary }: { summary: Summary }) {
             </li>
           ))}
       </ul>
-
-      <p className="text-xs opacity-55">
-        Spitze {summary.max_precipitation_mm_h.toFixed(1)} mm/h
-      </p>
     </div>
   )
 }
 
-function WindBar({
+function Bar({
   label,
   km,
   total,
@@ -194,7 +186,7 @@ function WindBar({
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-base-300/70">
         <div
-          className="h-full rounded-full transition-[width] duration-700 ease-out"
+          className="h-full rounded-full transition-[width] duration-500 ease-out"
           style={{
             width: `${share > 0 ? Math.max(share * 100, 2) : 0}%`,
             background: colour,
@@ -206,27 +198,28 @@ function WindBar({
   )
 }
 
-function Tile({ label, value, unit }: { label: string; value: string; unit: string }) {
+function Tile({
+  label,
+  value,
+  unit,
+  muted = false,
+}: {
+  label: string
+  value: string
+  unit: string
+  muted?: boolean
+}) {
   return (
-    <div className="rounded-box border border-base-300/60 bg-base-200/40 px-3.5 py-2.5">
+    <div
+      className={`rounded-box border border-base-300/60 bg-base-200/40 px-3.5 py-2.5 ${
+        muted ? 'opacity-55' : ''
+      }`}
+    >
       <div className="text-[11px] opacity-55">{label}</div>
       <div className="mt-0.5 text-xl leading-none font-semibold tabular-nums">
         {value}
         <span className="ml-1 text-xs font-normal opacity-45">{unit}</span>
       </div>
     </div>
-  )
-}
-
-function Notice({ tone, children }: { tone: 'info' | 'error'; children: React.ReactNode }) {
-  const styles =
-    tone === 'error'
-      ? 'border-error/25 bg-error/10 text-error'
-      : 'border-info/25 bg-info/10 text-info'
-
-  return (
-    <p className={`rounded-box border px-3.5 py-2.5 text-sm leading-snug ${styles}`}>
-      {children}
-    </p>
   )
 }

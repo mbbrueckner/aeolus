@@ -59,6 +59,80 @@ export function windOnRoute(
   }
 }
 
+export interface LiveSummary {
+  totalKm: number
+  headwindKm: number
+  crosswindKm: number
+  tailwindKm: number
+  calmKm: number
+  rainKm: number
+  meanWindKmH: number
+  maxRainMmH: number
+  maxProbability: number
+}
+
+/** Wind below this is not worth calling a head-, tail- or crosswind. */
+export const NOTABLE_WIND_KM_H = 12
+const NOTABLE_RAIN_MM_H = 0.4
+
+/**
+ * Summarise the whole route as it would be at one moment.
+ *
+ * This treats the route as if the rider were everywhere at once, which is the
+ * honest reading when no departure time was given: it answers "what is the
+ * weather doing along this route at 15:00", not "what will I meet".
+ */
+export function summariseAtSlot(
+  segments: Segment[],
+  field: Field,
+  slot: number,
+): LiveSummary {
+  const totals = {
+    totalKm: 0,
+    headwindKm: 0,
+    crosswindKm: 0,
+    tailwindKm: 0,
+    calmKm: 0,
+    rainKm: 0,
+    meanWindKmH: 0,
+    maxRainMmH: 0,
+    maxProbability: 0,
+  }
+
+  for (const segment of segments) {
+    const km = segment.distance_km
+    const [lat, lon] = segment.point
+    const wind = windOnRoute(field, lat, lon, slot, segment.bearing_deg)
+    const { precipitationProbability } = sampleProbability(field, lat, lon, slot)
+
+    totals.totalKm += km
+    totals.meanWindKmH += wind.speedKmH * km
+    totals.maxRainMmH = Math.max(totals.maxRainMmH, wind.precipitationMmH)
+    totals.maxProbability = Math.max(totals.maxProbability, precipitationProbability)
+
+    if (wind.precipitationMmH >= NOTABLE_RAIN_MM_H) totals.rainKm += km
+
+    if (Math.max(Math.abs(wind.headwindKmH), wind.crosswindKmH) < NOTABLE_WIND_KM_H) {
+      totals.calmKm += km
+    } else if (wind.alignment === 'headwind') {
+      totals.headwindKm += km
+    } else if (wind.alignment === 'tailwind') {
+      totals.tailwindKm += km
+    } else {
+      totals.crosswindKm += km
+    }
+  }
+
+  totals.meanWindKmH = totals.totalKm > 0 ? totals.meanWindKmH / totals.totalKm : 0
+  return totals
+}
+
+/** Chance of rain at a place and time, in percent. */
+export function sampleProbability(field: Field, lat: number, lon: number, slot: number) {
+  const stand: Field = { ...field, precipitation_mm_h: field.precipitation_probability }
+  return { precipitationProbability: sampleField(stand, lat, lon, slot).precipitationMmH }
+}
+
 /** Index of the slot covering a moment, clamped to the field's range. */
 export function slotIndexAt(field: Field, time: Date): number {
   const unix = time.getTime() / 1000

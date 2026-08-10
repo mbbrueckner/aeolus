@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { analyseRoute } from './api'
 import { ControlPanel } from './components/ControlPanel'
 import { RouteMap } from './components/RouteMap'
 import { SummaryPanel } from './components/SummaryPanel'
 import { ThemeToggle } from './components/ThemeToggle'
+import { slotIndexAt, summariseAtSlot } from './field'
 import { useTheme } from './theme'
 import type { Analysis } from './types'
 
@@ -12,12 +13,37 @@ export default function App() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [slot, setSlot] = useState(0)
+  const [playing, setPlaying] = useState(false)
 
-  async function handleSubmit(gpx: File, avgSpeedKmh: number, startTime: string) {
+  // Open on the departure time when there is one, otherwise on now.
+  useEffect(() => {
+    if (!analysis?.field) return
+    setPlaying(false)
+    const start = analysis.segments.find((segment) => segment.time)?.time
+    setSlot(slotIndexAt(analysis.field, start ? new Date(start) : new Date()))
+  }, [analysis])
+
+  const shownTime = analysis?.field ? new Date(analysis.field.slots[slot] * 1000) : null
+  const live = useMemo(() => {
+    if (!analysis?.field) return null
+    return summariseAtSlot(analysis.segments, analysis.field, slot)
+  }, [analysis, slot])
+
+  async function handleSubmit(
+    gpx: File,
+    ride: { avgSpeedKmh: number; startTime: string } | null,
+  ) {
     setBusy(true)
     setError(null)
     try {
-      setAnalysis(await analyseRoute({ gpx, avgSpeedKmh, startTime }))
+      setAnalysis(
+        await analyseRoute({
+          gpx,
+          avgSpeedKmh: ride?.avgSpeedKmh,
+          startTime: ride?.startTime,
+        }),
+      )
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
       setAnalysis(null)
@@ -51,7 +77,7 @@ export default function App() {
         {analysis && (
           <>
             <div className="h-px bg-base-300/70" />
-            <SummaryPanel summary={analysis.summary} />
+            <SummaryPanel live={live} shownTime={shownTime} summary={analysis.summary} />
           </>
         )}
 
@@ -72,7 +98,17 @@ export default function App() {
       </aside>
 
       <main className="relative min-h-[55vh] flex-1">
-        {analysis ? <RouteMap analysis={analysis} /> : <EmptyState busy={busy} />}
+        {analysis ? (
+          <RouteMap
+            analysis={analysis}
+            slot={slot}
+            onSlotChange={setSlot}
+            playing={playing}
+            onPlayingChange={setPlaying}
+          />
+        ) : (
+          <EmptyState busy={busy} />
+        )}
       </main>
     </div>
   )
@@ -124,8 +160,8 @@ function EmptyState({ busy }: { busy: boolean }) {
           {busy ? 'Route wird ausgewertet …' : 'Lade eine GPX-Datei hoch'}
         </h2>
         <p className="text-sm leading-relaxed opacity-45">
-          Aeolus schätzt, wann du wo sein wirst, und holt die Vorhersage für genau diese
-          Zeitpunkte — statt für den Tag insgesamt.
+          Du bekommst eine Wetterkarte deiner Route, die du über den Tag durchspielen
+          kannst. Abfahrtszeit und Schnitt sind optional.
         </p>
       </div>
     </div>
