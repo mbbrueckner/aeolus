@@ -161,3 +161,52 @@ def test_pedalling_mask_without_power_is_empty(fit_file):
 def test_pedalling_mask_returns_bool_array(fit_file):
     mask = pedalling_mask(load_ride(fit_file(n=200)))
     assert mask.dtype == bool
+
+
+# ── bearing_deg ───────────────────────────────────────────────────
+
+def test_bearing_of_northward_ride(fit_file):
+    """The synthetic ride moves mostly north, slightly east."""
+    from app.calibration.rides import bearing_deg
+    heading = bearing_deg(load_ride(fit_file(n=300)))
+    assert 0.0 < np.nanmedian(heading) < 45.0
+
+def test_bearing_stays_in_range(fit_file):
+    from app.calibration.rides import bearing_deg
+    heading = bearing_deg(load_ride(fit_file(n=300)))
+    assert np.nanmin(heading) >= 0.0 and np.nanmax(heading) < 360.0
+
+def test_bearing_without_position_is_nan(fit_file):
+    from app.calibration.rides import bearing_deg
+    assert np.all(np.isnan(bearing_deg(load_ride(fit_file(n=200, with_position=False)))))
+
+
+# ── headwind_from_forecast ────────────────────────────────────────
+
+def test_wind_from_ahead_is_a_headwind():
+    from app.calibration.rides import headwind_from_forecast
+    got = headwind_from_forecast(np.array([90.0]), np.array([5.0]), np.array([90.0]))
+    assert math.isclose(got[0], 5.0, abs_tol=1e-9)
+
+def test_wind_from_behind_is_a_tailwind():
+    from app.calibration.rides import headwind_from_forecast
+    got = headwind_from_forecast(np.array([90.0]), np.array([5.0]), np.array([270.0]))
+    assert math.isclose(got[0], -5.0, abs_tol=1e-9)
+
+def test_wind_from_the_side_cancels():
+    from app.calibration.rides import headwind_from_forecast
+    got = headwind_from_forecast(np.array([90.0]), np.array([5.0]), np.array([0.0]))
+    assert math.isclose(got[0], 0.0, abs_tol=1e-9)
+
+def test_headwind_never_exceeds_wind_speed():
+    from app.calibration.rides import headwind_from_forecast
+    directions = np.arange(0.0, 360.0, 5.0)
+    got = headwind_from_forecast(np.full_like(directions, 90.0),
+                                 np.full_like(directions, 7.0), directions)
+    assert np.all(np.abs(got) <= 7.0 + 1e-9)
+
+def test_headwind_reverses_with_travel_direction():
+    from app.calibration.rides import headwind_from_forecast
+    out = headwind_from_forecast(np.array([90.0]), np.array([6.0]), np.array([90.0]))
+    back = headwind_from_forecast(np.array([270.0]), np.array([6.0]), np.array([90.0]))
+    assert math.isclose(out[0], -back[0], abs_tol=1e-9)

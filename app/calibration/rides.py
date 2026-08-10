@@ -186,6 +186,70 @@ def acceleration(samples: RideSamples, window_s: float = SPEED_WINDOW_S) -> np.n
         return np.where(np.abs(time_step) > 1e-6, np.gradient(smoothed) / time_step, np.nan)
 
 
+def bearing_deg(samples: RideSamples, window_s: float = SPEED_WINDOW_S) -> np.ndarray:
+    """Compute the direction of travel per sample.
+
+    Positions are compared across a window rather than between neighbours,
+    since consecutive GPS fixes are close enough that their noise dominates
+    the heading.
+
+    Args:
+        samples: The ride.
+        window_s: Width of the comparison window in seconds.
+
+    Returns:
+        Bearing per sample in degrees clockwise from north. NaN where position
+        is missing.
+    """
+    latitude = _fill_gaps(samples.latitude_deg)
+    longitude = _fill_gaps(samples.longitude_deg)
+    if np.all(np.isnan(latitude)):
+        return np.full(len(samples), np.nan)
+
+    interval = max(samples.median_interval_s, 1e-6)
+    step = max(1, int(round(window_s / interval)))
+
+    ahead = np.roll(latitude, -step)
+    ahead_lon = np.roll(longitude, -step)
+    ahead[-step:] = latitude[-step:]
+    ahead_lon[-step:] = longitude[-step:]
+
+    mean_lat = np.radians((latitude + ahead) / 2.0)
+    north = np.radians(ahead - latitude)
+    east = np.radians(ahead_lon - longitude) * np.cos(mean_lat)
+
+    with np.errstate(invalid="ignore"):
+        heading = np.degrees(np.arctan2(east, north)) % 360.0
+
+    stationary = np.hypot(north, east) < 1e-9
+    heading[stationary] = np.nan
+    return heading
+
+
+def headwind_from_forecast(
+    bearing: np.ndarray,
+    wind_speed: np.ndarray,
+    wind_direction_deg: np.ndarray,
+) -> np.ndarray:
+    """Project a forecast wind onto the direction of travel.
+
+    Args:
+        bearing: Direction of travel in degrees clockwise from north.
+        wind_speed: Wind speed in any unit; the result carries the same one.
+        wind_direction_deg: Meteorological wind origin direction in degrees.
+
+    Returns:
+        Component of the wind opposing travel, positive for a headwind.
+    """
+    travel = np.radians(bearing)
+    blowing_towards = np.radians((wind_direction_deg + 180.0) % 360.0)
+
+    alignment = (
+        np.sin(travel) * np.sin(blowing_towards) + np.cos(travel) * np.cos(blowing_towards)
+    )
+    return -wind_speed * alignment
+
+
 def pedalling_mask(
     samples: RideSamples,
     minimum_speed_m_s: float = 3.0,
