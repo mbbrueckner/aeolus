@@ -170,6 +170,7 @@ def fit_aerodynamics(
     headwind_m_s: np.ndarray | None = None,
     acceleration_m_s2: np.ndarray | None = None,
     air_density: np.ndarray | float = SEA_LEVEL_DENSITY_KG_M3,
+    fixed_crr: float | None = None,
 ) -> Aerodynamics:
     """Fit CdA and Crr to recorded samples by least squares.
 
@@ -177,6 +178,12 @@ def fit_aerodynamics(
     coefficients, so no iterative solver is needed. Pass ``headwind_m_s`` when
     it is known; leaving it out assumes still air, which is only safe on rides
     picked for being calm.
+
+    Fitting both coefficients needs the samples to span a range of speeds and
+    gradients. A single steady ride often does not, leaving the two terms
+    poorly separated and Crr free to come out negative. Passing ``fixed_crr``
+    reduces the problem to one parameter, which is the reliable way to compare
+    CdA across individual rides.
 
     Args:
         rider: Rider mass and drivetrain efficiency.
@@ -188,6 +195,7 @@ def fit_aerodynamics(
         acceleration_m_s2: Rates of change of ground speed, or None for steady
             state.
         air_density: Air density in kg/m³, per sample or as one value.
+        fixed_crr: Rolling resistance to hold constant, or None to fit it.
 
     Returns:
         The fitted coefficients.
@@ -213,16 +221,21 @@ def fit_aerodynamics(
     air_speed = speed + wind
     weight = rider.total_mass_kg * GRAVITY_M_S2
 
-    design = np.column_stack([
-        weight * cos_theta,
-        0.5 * density * air_speed * np.abs(air_speed),
-    ])
+    drag_column = 0.5 * density * air_speed * np.abs(air_speed)
+    rolling_column = weight * cos_theta
     target = (
         power * rider.drivetrain_efficiency / speed
         - weight * sin_theta
         - rider.total_mass_kg * accel
     )
 
+    if fixed_crr is not None:
+        (cda,), *_ = np.linalg.lstsq(
+            drag_column[:, None], target - fixed_crr * rolling_column, rcond=None
+        )
+        return Aerodynamics(cda_m2=float(cda), crr=fixed_crr)
+
+    design = np.column_stack([rolling_column, drag_column])
     (crr, cda), *_ = np.linalg.lstsq(design, target, rcond=None)
     return Aerodynamics(cda_m2=float(cda), crr=float(crr))
 

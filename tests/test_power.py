@@ -215,3 +215,46 @@ def test_fitted_coefficients_recover_the_wind():
     recovered = solve_headwind_m_s(power, RIDER, fitted, 7.5, 0.01)
 
     assert math.isclose(recovered, true_wind, abs_tol=0.05)
+
+
+# ── fit_aerodynamics with a fixed Crr ─────────────────────────────
+
+def test_fixed_crr_is_returned_unchanged():
+    power, speed, gradient, _, accel = synthetic_ride()
+    fitted = fit_aerodynamics(RIDER, power, speed, gradient,
+                              acceleration_m_s2=accel, fixed_crr=0.004)
+    assert fitted.crr == 0.004
+
+def test_fixed_crr_recovers_cda_when_crr_is_right():
+    power, speed, gradient, _, accel = synthetic_ride()
+    fitted = fit_aerodynamics(RIDER, power, speed, gradient,
+                              acceleration_m_s2=accel, fixed_crr=AERO.crr)
+    assert math.isclose(fitted.cda_m2, AERO.cda_m2, rel_tol=1e-6)
+
+def test_wrong_fixed_crr_biases_cda():
+    """Holding Crr too high must push the drag term down, not silently pass."""
+    power, speed, gradient, _, accel = synthetic_ride()
+    fitted = fit_aerodynamics(RIDER, power, speed, gradient,
+                              acceleration_m_s2=accel, fixed_crr=AERO.crr * 3)
+    assert fitted.cda_m2 < AERO.cda_m2
+
+def test_fixed_crr_detects_a_lower_drag_ride():
+    """Drafting shows up as reduced CdA, which is how group rides are spotted."""
+    drafted = Aerodynamics(cda_m2=AERO.cda_m2 * 0.7, crr=AERO.crr)
+    power, speed, gradient, _, accel = synthetic_ride(aero=drafted, seed=9)
+    fitted = fit_aerodynamics(RIDER, power, speed, gradient,
+                              acceleration_m_s2=accel, fixed_crr=AERO.crr)
+    assert math.isclose(fitted.cda_m2, drafted.cda_m2, rel_tol=1e-6)
+
+def test_fixed_crr_is_stable_on_a_short_steady_ride():
+    """The case where fitting both coefficients goes degenerate."""
+    rng = np.random.default_rng(4)
+    speed = rng.uniform(7.8, 8.2, 300)
+    gradient = rng.uniform(-0.002, 0.002, 300)
+    power = np.array([expected_power_w(RIDER, AERO, s, g) for s, g in zip(speed, gradient)])
+
+    loose = fit_aerodynamics(RIDER, power, speed, gradient)
+    tight = fit_aerodynamics(RIDER, power, speed, gradient, fixed_crr=AERO.crr)
+
+    assert math.isclose(tight.cda_m2, AERO.cda_m2, rel_tol=0.02)
+    assert abs(tight.cda_m2 - AERO.cda_m2) < abs(loose.cda_m2 - AERO.cda_m2)
