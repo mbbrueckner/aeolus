@@ -6,7 +6,7 @@ This module defines the core data structures used to represent GPS route points,
 __author__ = "mbbrueckner"
 __version__ = "1.0.0"
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 @dataclass
@@ -18,12 +18,17 @@ class RoutePoint:
         lon: Longitude in decimal degrees.
         elevation_m: Elevation above sea level in meters, if available.
         timestamp: UTC timestamp of the recorded point, if available.
+        track_index: Position of this point in the unsimplified track, if it
+            came from one. Simplification keeps only a fraction of the points,
+            so this is what maps a cluster back to the full-resolution geometry
+            for drawing.
     """
 
     lat: float
     lon: float
     elevation_m: float | None = None
     timestamp: datetime | None = None
+    track_index: int | None = None
 
 
 @dataclass
@@ -68,8 +73,30 @@ class ClusteredRoute:
 
     Attributes:
         clusters: List of SegmentClusters that make up the route.
+        track: The full-resolution track the clusters were derived from.
+            Clustering runs on a simplified copy, which is fine for sampling
+            weather but too coarse to draw.
     """
     clusters: list[SegmentCluster]
+    track: list[RoutePoint] = field(default_factory=list)
+
+    def points_for(self, cluster: SegmentCluster) -> list[RoutePoint]:
+        """Return a cluster's geometry at full resolution.
+
+        Args:
+            cluster: One of this route's clusters.
+
+        Returns:
+            The original track points spanning the cluster, or the cluster's
+            own simplified points if the track is unavailable.
+        """
+        start = cluster.segments[0].start.track_index if cluster.segments else None
+        end = cluster.segments[-1].end.track_index if cluster.segments else None
+
+        if not self.track or start is None or end is None:
+            return [cluster.segments[0].start] + [s.end for s in cluster.segments]
+
+        return self.track[start : end + 1]
 
     @property
     def total_distance_m(self) -> float:

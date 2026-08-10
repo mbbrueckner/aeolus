@@ -11,7 +11,7 @@ __version__ = "2.0.0"
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.models import ClusterWeatherSnapshot
+from app.models import ClusteredRoute, ClusterWeatherSnapshot
 from app.services.gpx_parser import get_clustered_route
 from app.services.route_scorer import ScoringParams, SegmentScore, score_segment
 from app.services.summary import RouteSummary, summarise
@@ -23,11 +23,13 @@ class RouteAnalysis:
     """A scored route together with the weather it was scored from.
 
     Attributes:
+        route: The clustered route, carrying the full-resolution track.
         snapshots: Weather per cluster, in route order.
         scores: Score per cluster, matching the snapshots.
         summary: Route-level facts aggregated from the clusters.
     """
 
+    route: ClusteredRoute
     snapshots: list[ClusterWeatherSnapshot]
     scores: list[SegmentScore]
     summary: RouteSummary
@@ -63,6 +65,7 @@ def analyze_route(
     ]
 
     return RouteAnalysis(
+        route=route_clusters,
         snapshots=snapshots,
         scores=scores,
         summary=summarise(snapshots, scores),

@@ -165,11 +165,7 @@ def _to_payload(analysis: RouteAnalysis) -> dict:
         covered_m += snapshot.cluster.total_distance_m
 
     return {
-        "route": [
-            point
-            for snapshot in analysis.snapshots
-            for point in _coordinates(snapshot)
-        ],
+        "route": [[p.lat, p.lon] for p in analysis.route.track],
         "summary": {
             "total_distance_km": summary.total_distance_m / 1000.0,
             "headwind_km": summary.headwind_distance_m / 1000.0,
@@ -195,7 +191,9 @@ def _to_payload(analysis: RouteAnalysis) -> dict:
         },
         "segments": [
             {
-                "coordinates": _coordinates(snapshot),
+                "coordinates": [
+                    [p.lat, p.lon] for p in analysis.route.points_for(snapshot.cluster)
+                ],
                 "point": [
                     snapshot.cluster.representative_point.lat,
                     snapshot.cluster.representative_point.lon,
@@ -221,23 +219,6 @@ def _to_payload(analysis: RouteAnalysis) -> dict:
             )
         ],
     }
-
-
-def _coordinates(snapshot) -> list[list[float]]:
-    """Extract a cluster's polyline.
-
-    Args:
-        snapshot: The cluster's weather snapshot.
-
-    Returns:
-        Latitude and longitude pairs from the cluster's first point onwards.
-    """
-    segments = snapshot.cluster.segments
-    if not segments:
-        return []
-    return [[segments[0].start.lat, segments[0].start.lon]] + [
-        [segment.end.lat, segment.end.lon] for segment in segments
-    ]
 
 
 def _isoformat(moment: datetime | None) -> str | None:

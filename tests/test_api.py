@@ -8,6 +8,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.analyzer import RouteAnalysis
+from app.models import ClusteredRoute, ClusterWeatherSnapshot, RoutePoint, Segment, SegmentCluster
 from app.services.route_scorer import score_segment
 from app.services.summary import summarise
 from app.web.api import app
@@ -22,10 +23,19 @@ GPX = b"""<?xml version="1.0"?>
 </trkseg></trk></gpx>"""
 
 
-def analysis_of(snapshots) -> RouteAnalysis:
+def analysis_of(snapshots, track=None) -> RouteAnalysis:
     """Score snapshots and wrap them the way analyze_route would."""
     scores = [score_segment(s) for s in snapshots]
-    return RouteAnalysis(snapshots=snapshots, scores=scores, summary=summarise(snapshots, scores))
+    route = ClusteredRoute(
+        clusters=[s.cluster for s in snapshots],
+        track=track or [],
+    )
+    return RouteAnalysis(
+        route=route,
+        snapshots=snapshots,
+        scores=scores,
+        summary=summarise(snapshots, scores),
+    )
 
 
 def post(analysis: RouteAnalysis | None = None, field=None, **overrides):
@@ -210,8 +220,10 @@ def test_route_still_analyses_when_the_field_fails():
 # ── Route geometry ────────────────────────────────────────────────
 
 def test_route_polyline_is_returned():
-    response = post(analysis_of([make_snapshot()]), field=stub_field)
-    assert response.json()["route"]
+    track = [RoutePoint(lat=48.0 + i * 0.01, lon=11.0, track_index=i) for i in range(5)]
+    response = post(analysis_of([make_snapshot()], track=track), field=stub_field)
+
+    assert response.json()["route"] == [[p.lat, p.lon] for p in track]
 
 def test_segments_carry_their_position_along_the_route():
     response = post(analysis_of([
@@ -224,3 +236,53 @@ def test_segments_carry_their_position_along_the_route():
     assert segments[0]["mid_distance_km"] == 1.0
     assert segments[1]["start_distance_km"] == 2.0
     assert segments[1]["mid_distance_km"] == 4.0
+
+
+# ── Full-resolution geometry ──────────────────────────────────────
+
+def detailed_route(corner_points: int = 40):
+    """A cluster whose two endpoints hide many points in between.
+
+    Simplification keeps only the ends of a straight-ish run, so drawing from
+    the simplified track cuts every corner the rider actually rode.
+    """
+    track = [
+        RoutePoint(lat=48.0 + i * 0.001, lon=11.0 + (i % 2) * 0.002, track_index=i)
+        for i in range(corner_points)
+    ]
+    segment = Segment(start=track[0], end=track[-1], bearing_deg=45.0, distance_m=5000.0)
+    cluster = SegmentCluster(
+        segments=[segment], mean_bearing=45.0, representative_point=track[len(track) // 2]
+    )
+    snapshot = ClusterWeatherSnapshot(
+        cluster=cluster,
+        timestamp=datetime(2026, 8, 12, 14, 0, tzinfo=timezone.utc),
+        wind_speed_km_h=20.0,
+        wind_direction_deg=90.0,
+        wind_gusts_km_h=25.0,
+        precipitation_mm_h=0.0,
+    )
+    return track, snapshot
+
+
+def test_route_is_drawn_at_full_resolution():
+    track, snapshot = detailed_route(40)
+    response = post(analysis_of([snapshot], track=track), field=stub_field)
+
+    assert len(response.json()["route"]) == 40
+
+def test_segment_geometry_follows_the_recorded_track():
+    """The bug: a cluster was drawn as a straight line between its endpoints."""
+    track, snapshot = detailed_route(40)
+    response = post(analysis_of([snapshot], track=track), field=stub_field)
+    coordinates = response.json()["segments"][0]["coordinates"]
+
+    assert len(coordinates) == 40
+    assert coordinates[0] == [track[0].lat, track[0].lon]
+    assert coordinates[-1] == [track[-1].lat, track[-1].lon]
+
+def test_geometry_falls_back_when_no_track_is_available():
+    track, snapshot = detailed_route(40)
+    response = post(analysis_of([snapshot]), field=stub_field)
+
+    assert len(response.json()["segments"][0]["coordinates"]) == 2

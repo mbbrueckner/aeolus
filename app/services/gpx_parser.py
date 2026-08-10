@@ -35,24 +35,22 @@ def get_clustered_route(file_content: bytes, avg_speed_kmh: float, start_time: d
     Returns:
         ClusteredRoute containing all SegmentClusters representing straight portions of the route.
     """
-    points = parse_gpx(file_content)
+    track = parse_track(file_content)
+    points = _simplify(track)
     segments = split_into_segments(points)
     clusters = cluster_segments(segments, avg_speed_kmh, start_time)
-    return ClusteredRoute(clusters=clusters)
+    return ClusteredRoute(clusters=clusters, track=track)
 
 
-def parse_gpx(file_content: bytes) -> list[RoutePoint]:
-    """Parse a GPX file and extract an ordered list of descriptive RoutePoints.
-
-    Iterates over all tracks and segments in the GPX data and collects
-    each point as a RoutePoint.
-    Runs a simplification step to reduce the number of points while preserving the route shape.
+def parse_track(file_content: bytes) -> list[RoutePoint]:
+    """Parse a GPX file into its full-resolution track.
 
     Args:
         file_content: Raw bytes of a GPX file.
 
     Returns:
-        Ordered list of descriptive RoutePoints.
+        Every recorded point, in order, each tagged with its position in the
+        track.
     """
     gpx = gpxpy.parse(file_content)
     points = []
@@ -65,9 +63,26 @@ def parse_gpx(file_content: bytes) -> list[RoutePoint]:
                         lon=p.longitude,
                         elevation_m=p.elevation,
                         timestamp=p.time,
+                        track_index=len(points),
                     )
                 )
-    return _simplify(points)
+    return points
+
+
+def parse_gpx(file_content: bytes) -> list[RoutePoint]:
+    """Parse a GPX file and simplify it for analysis.
+
+    The simplified track is what clustering and weather sampling run on. Use
+    :func:`parse_track` when the geometry is going to be drawn, since dropping
+    points visibly cuts corners.
+
+    Args:
+        file_content: Raw bytes of a GPX file.
+
+    Returns:
+        Ordered list of RoutePoints with redundant points removed.
+    """
+    return _simplify(parse_track(file_content))
 
 
 def split_into_segments(points: list[RoutePoint]) -> list[Segment]:
