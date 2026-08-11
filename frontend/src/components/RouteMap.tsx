@@ -1,8 +1,14 @@
 import { useEffect, useMemo } from 'react'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import type { Analysis, Segment } from '../types'
-import { distanceAtTime, positionAtDistance, windOnRoute } from '../field'
+import type { Analysis, Field, Segment } from '../types'
+import {
+  distanceAtTime,
+  positionAtDistance,
+  sampleField,
+  windDirectionDeg,
+  windOnRoute,
+} from '../field'
 import {
   ALIGNMENT_COLOUR,
   ALIGNMENT_LABEL,
@@ -66,7 +72,11 @@ export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChang
         ))}
 
         {segments.map((segment, index) => (
-          <Marker key={`arrow-${index}`} position={segment.point} icon={pinIcon(segment)}>
+          <Marker
+            key={`arrow-${index}`}
+            position={segment.point}
+            icon={pinIcon(segment, field, slot)}
+          >
             <Popup>
               <SegmentPopup segment={segment} />
             </Popup>
@@ -225,11 +235,26 @@ function FitToRoute({ segments }: { segments: Segment[] }) {
   return null
 }
 
-/** A small marker at each forecast point along the route. */
-function pinIcon(segment: Segment): L.DivIcon {
-  const colour =
-    isNotable(segment) && segment.alignment ? ALIGNMENT_COLOUR[segment.alignment] : '#64748b'
-  const rotation = arrowRotation(segment.wind_direction_deg ?? 0)
+/**
+ * A marker at each forecast point along the route.
+ *
+ * Reads the field at the displayed time rather than the arrival weather, so
+ * the arrows turn with the slider instead of standing still.
+ */
+function pinIcon(segment: Segment, field: Field | null, slot: number): L.DivIcon {
+  let colour = '#64748b'
+  let rotation = arrowRotation(segment.wind_direction_deg ?? 0)
+
+  if (field) {
+    const [lat, lon] = segment.point
+    const wind = windOnRoute(field, lat, lon, slot, segment.bearing_deg)
+    const notable = Math.max(Math.abs(wind.headwindKmH), wind.crosswindKmH) >= 12
+
+    colour = notable ? ALIGNMENT_COLOUR[wind.alignment] : '#64748b'
+    rotation = arrowRotation(windDirectionDeg(sampleField(field, lat, lon, slot)))
+  } else if (isNotable(segment) && segment.alignment) {
+    colour = ALIGNMENT_COLOUR[segment.alignment]
+  }
 
   return L.divIcon({
     className: '',

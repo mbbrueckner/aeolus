@@ -122,9 +122,9 @@ def test_field_is_shaped_rows_columns_slots():
     assert columns == len(field.longitudes)
     assert slots == len(field.slots)
 
-def test_one_request_covers_the_whole_grid():
+def test_a_small_grid_takes_a_single_request():
     client = fake_client()
-    fetch_field((48.0, 48.2, 11.0, 11.3), date(2026, 8, 12), client=client)
+    fetch_field((48.0, 48.05, 11.0, 11.05), date(2026, 8, 12), client=client)
     assert client.weather_api.call_count == 1
 
 def test_slots_are_quarter_hours():
@@ -184,3 +184,44 @@ def test_probability_is_carried_through():
 def test_probability_is_shaped_like_the_rest():
     field = fetch_field((48.0, 48.2, 11.0, 11.3), date(2026, 8, 12), client=fake_client())
     assert field.precipitation_probability.shape == field.precipitation_mm_h.shape
+
+
+# ── Coverage and request splitting ────────────────────────────────
+
+def test_margin_grows_with_the_route():
+    """A long route needs a wider surround than a short one."""
+    short = route_bounds([RoutePoint(lat=48.0, lon=11.0), RoutePoint(lat=48.02, lon=11.0)])
+    long = route_bounds([RoutePoint(lat=48.0, lon=11.0), RoutePoint(lat=48.9, lon=11.0)])
+
+    short_margin = 48.0 - short[0]
+    long_margin = 48.0 - long[0]
+    assert long_margin > short_margin * 5
+
+def test_field_reaches_well_past_the_route():
+    """The overlay is drawn on a map, so a tight box shows as a floating square."""
+    south, north, west, east = route_bounds([
+        RoutePoint(lat=48.0, lon=11.0),
+        RoutePoint(lat=48.1, lon=11.1),
+    ])
+    route_height = 48.1 - 48.0
+    assert (north - south) > route_height * 2.5
+
+def test_large_grids_are_split_across_requests():
+    """Coordinates ride in the query string, and a long enough one gets a 414."""
+    client = fake_client()
+    fetch_field((45.0, 55.0, 5.0, 15.0), date(2026, 8, 12), client=client)
+
+    assert client.weather_api.call_count > 1
+
+def test_split_requests_still_yield_one_field():
+    client = fake_client(speed_m_s=5.0, direction_deg=270.0)
+    field = fetch_field((45.0, 55.0, 5.0, 15.0), date(2026, 8, 12), client=client)
+    rows, columns, _ = field.shape
+
+    assert rows * columns == len(field.latitudes) * len(field.longitudes)
+    assert np.allclose(field.wind_u_m_s, 5.0, atol=1e-9)
+
+def test_small_grids_still_take_one_request():
+    client = fake_client()
+    fetch_field((48.0, 48.02, 11.0, 11.02), date(2026, 8, 12), client=client)
+    assert client.weather_api.call_count == 1

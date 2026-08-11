@@ -108,12 +108,33 @@ function render(field: Field, slot: number): string | null {
       image.data[offset] = r
       image.data[offset + 1] = g
       image.data[offset + 2] = b
-      image.data[offset + 3] = a
+      image.data[offset + 3] = Math.round(a * edgeFade(x, y, width, height))
     }
   }
 
   context.putImageData(image, 0, 0)
   return canvas.toDataURL()
+}
+
+/** Fraction of the image width over which the edge fades out. */
+const FADE = 0.14
+
+/**
+ * Soften the border of the field.
+ *
+ * The forecast covers a rectangle, but a hard edge reads as a pasted-on
+ * rectangle rather than as weather that simply continues past the data.
+ */
+function edgeFade(x: number, y: number, width: number, height: number): number {
+  const towards = (position: number, extent: number) => {
+    const margin = extent * FADE
+    const distance = Math.min(position, extent - 1 - position)
+    return margin <= 0 ? 1 : Math.min(1, distance / margin)
+  }
+
+  const factor = Math.min(towards(x, width), towards(y, height))
+  // Smoothstep, so the fade has no visible seam where it begins.
+  return factor * factor * (3 - 2 * factor)
 }
 
 /** Interpolate the rain colour scale at a given rate. */

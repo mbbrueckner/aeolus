@@ -26,9 +26,18 @@ FIELD_URL = "https://api.open-meteo.com/v1/forecast"
 SLOT_SECONDS = 900
 
 MODEL_RESOLUTION_KM = 2.0
-MAX_GRID_SIDE = 11
+MAX_GRID_SIDE = 14
 MIN_GRID_SIDE = 3
-MARGIN_KM = 3.0
+
+# The field is drawn as a map overlay, so it has to reach past the edges of the
+# view. A margin that merely clears the route leaves a small rectangle floating
+# on a large map.
+MIN_MARGIN_KM = 10.0
+MARGIN_FRACTION = 0.7
+
+# Coordinates travel in the query string, and Open-Meteo answers a long enough
+# one with 414 rather than truncating it.
+MAX_POINTS_PER_REQUEST = 100
 
 FIELD_VARIABLES = [
     "precipitation",
@@ -93,9 +102,16 @@ def route_bounds(points: list[RoutePoint]) -> tuple[float, float, float, float]:
     latitudes = [p.lat for p in points]
     longitudes = [p.lon for p in points]
     mean_lat = sum(latitudes) / len(latitudes)
+    lon_per_km = 111.32 * max(math.cos(math.radians(mean_lat)), 0.01)
 
-    lat_margin = MARGIN_KM / 111.32
-    lon_margin = MARGIN_KM / (111.32 * max(math.cos(math.radians(mean_lat)), 0.01))
+    extent_km = max(
+        (max(latitudes) - min(latitudes)) * 111.32,
+        (max(longitudes) - min(longitudes)) * lon_per_km,
+    )
+    margin_km = max(MIN_MARGIN_KM, extent_km * MARGIN_FRACTION)
+
+    lat_margin = margin_km / 111.32
+    lon_margin = margin_km / lon_per_km
 
     return (
         min(latitudes) - lat_margin,
@@ -151,20 +167,26 @@ def fetch_field(
     """
     latitudes, longitudes = grid_for_bounds(bounds)
     points = [(lat, lon) for lat in latitudes for lon in longitudes]
+    api = client or openmeteo_requests.Client()
 
-    responses = (client or openmeteo_requests.Client()).weather_api(
-        FIELD_URL,
-        params={
-            "latitude": [lat for lat, _ in points],
-            "longitude": [lon for _, lon in points],
-            "minutely_15": FIELD_VARIABLES,
-            "start_date": day.isoformat(),
-            "end_date": (end_day or day).isoformat(),
-            "wind_speed_unit": "ms",
-            "precipitation_unit": "mm",
-            "models": "best_match",
-        },
-    )
+    responses = []
+    for start in range(0, len(points), MAX_POINTS_PER_REQUEST):
+        chunk = points[start : start + MAX_POINTS_PER_REQUEST]
+        responses.extend(
+            api.weather_api(
+                FIELD_URL,
+                params={
+                    "latitude": [lat for lat, _ in chunk],
+                    "longitude": [lon for _, lon in chunk],
+                    "minutely_15": FIELD_VARIABLES,
+                    "start_date": day.isoformat(),
+                    "end_date": (end_day or day).isoformat(),
+                    "wind_speed_unit": "ms",
+                    "precipitation_unit": "mm",
+                    "models": "best_match",
+                },
+            )
+        )
 
     return _to_field(responses, latitudes, longitudes)
 

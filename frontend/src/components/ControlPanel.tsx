@@ -1,22 +1,23 @@
 import { useRef, useState } from 'react'
+import { DepartureField } from './DepartureField'
 
 interface Props {
   busy: boolean
   onSubmit: (gpx: File, ride: { avgSpeedKmh: number; startTime: string } | null) => void
 }
 
-/** Local wall-clock time in the format a datetime-local input expects. */
-function nowForInput(): string {
+/** Now, rounded up to the next quarter hour the forecast is published for. */
+function nextQuarterHour(): Date {
   const now = new Date()
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset(), 0, 0)
-  return now.toISOString().slice(0, 16)
+  now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0)
+  return now
 }
 
 export function ControlPanel({ busy, onSubmit }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [planRide, setPlanRide] = useState(false)
   const [speed, setSpeed] = useState(22)
-  const [start, setStart] = useState(nowForInput)
+  const [start, setStart] = useState(nextQuarterHour)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -30,7 +31,12 @@ export function ControlPanel({ busy, onSubmit }: Props) {
       onSubmit={(event) => {
         event.preventDefault()
         if (file) {
-          onSubmit(file, planRide ? { avgSpeedKmh: speed, startTime: start } : null)
+          // toISOString carries the zone, so the server does not read a local
+          // wall-clock time as UTC.
+          onSubmit(
+            file,
+            planRide ? { avgSpeedKmh: speed, startTime: start.toISOString() } : null,
+          )
         }
       }}
     >
@@ -111,16 +117,7 @@ export function ControlPanel({ busy, onSubmit }: Props) {
 
         {planRide && (
           <div className="space-y-4 border-t border-base-300/60 px-3.5 py-3.5">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium opacity-75">Abfahrt</span>
-              <input
-                type="datetime-local"
-                required
-                value={start}
-                className="input input-sm w-full"
-                onChange={(event) => setStart(event.target.value)}
-              />
-            </label>
+            <DepartureField value={start} onChange={setStart} />
 
             <label className="block">
               <span className="mb-1.5 flex items-baseline justify-between text-sm font-medium">

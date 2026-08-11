@@ -99,37 +99,6 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/*
- * Native date and file pickers ignore utility classes. color-scheme comes from
- * the DaisyUI theme and makes the browser's own calendar match, and these rules
- * bring the parts that do respond into line with the rest of the form.
- */
-input[type="datetime-local"] {
-  font-variant-numeric: tabular-nums;
-}
-
-input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  padding: 0.15rem;
-  border-radius: 0.35rem;
-  opacity: 0.5;
-  cursor: pointer;
-  transition: opacity 0.15s ease, background-color 0.15s ease;
-}
-
-input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-  background-color: color-mix(in oklch, var(--color-base-content) 12%, transparent);
-}
-
-input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
-  padding: 0;
-}
-
-input[type="datetime-local"]::-webkit-datetime-edit-text {
-  opacity: 0.4;
-  padding: 0 0.1rem;
-}
-
 /* Leaflet paints its own tiles, so the container needs an explicit ground. */
 .leaflet-container {
   background: var(--color-base-200);
