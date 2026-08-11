@@ -68,9 +68,6 @@ export const de = {
     rainFrom: 'Regen ab <0>km {{km}}</0>',
     rainFromAt: 'Regen ab <0>km {{km}}</0>, gegen {{time}} Uhr',
     unsafe: 'Auf <0>{{km}} km</0> sind die Bedingungen kritisch — auf der Karte gestrichelt.',
-    score: 'Gesamtbewertung',
-    scoreNote:
-      'Eine zusammenfassende Zahl von −1 bis +1. Sie ist noch nicht gegen echte Fahrten kalibriert — verlass dich lieber auf die Kilometer oben.',
   },
 
   map: {

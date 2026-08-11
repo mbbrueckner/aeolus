@@ -104,31 +104,6 @@ function OnYourRide({ summary }: { summary: Summary }) {
         </p>
       )}
 
-      <details className="group rounded-box bg-base-200/60">
-        <summary className="flex cursor-pointer list-none items-center justify-between px-3.5 py-2.5 text-sm">
-          <span className="opacity-70">{t('summary.score')}</span>
-          <span className="flex items-center gap-1.5 font-semibold tabular-nums">
-            {summary.score >= 0 ? '+' : ''}
-            {summary.score.toFixed(2)}
-            <svg
-              className="opacity-40 transition-transform group-open:rotate-180"
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </span>
-        </summary>
-        <p className="px-3.5 pb-3 text-xs leading-relaxed opacity-60">
-          {t('summary.scoreNote')}
-        </p>
-      </details>
     </section>
   )
 }

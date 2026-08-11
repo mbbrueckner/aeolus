@@ -15,6 +15,25 @@ otherwise have been.
 
 Every tunable number lives in :class:`ScoringParams`. The defaults are informed
 guesses, not calibrated values.
+
+**The combined score is deliberately not shown to riders.** Checked against 60
+recorded rides, its wind term ranks conditions correctly — a correlation of
+-0.58 against the extra power a power meter actually measured, with the best
+and worst thirds forty watts apart, and the right sign on 54 of 59 rides. But
+that is as far as the evidence goes:
+
+- A plain linear headwind predicts those costs just as well, so the shape of
+  the curve is unproven over the range real rides cover.
+- The crosswind, gust and rain terms have never been checked against anything,
+  because no instrument on a bike measures discomfort.
+- Absolute levels are not measurable at all from power, since drafting and
+  headwind look identical to a power meter.
+
+So the number carries no information the distances in the summary do not
+already carry, while implying a precision that is not there. What survives is
+the *ordering*: the wind term is continuous, monotone and free of cliffs, which
+is what a departure-time or direction recommendation needs internally. The
+module is kept intact for that, and in case the question is revisited.
 """
 
 __author__ = "mbbrueckner"

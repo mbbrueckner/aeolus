@@ -71,9 +71,6 @@ export const en: typeof de = {
     rainFrom: 'Rain from <0>km {{km}}</0>',
     rainFromAt: 'Rain from <0>km {{km}}</0>, around {{time}}',
     unsafe: 'Conditions are severe over <0>{{km}} km</0> — dashed on the map.',
-    score: 'Overall score',
-    scoreNote:
-      'A single number from −1 to +1. It has not been calibrated against real rides yet — trust the distances above instead.',
   },
 
   map: {
