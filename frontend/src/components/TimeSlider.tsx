@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { timeAtSlot } from '../field'
+import { useEffect, useRef, useState } from 'react'
+import { slotIndexAt, timeAtSlot } from '../field'
 import type { Field } from '../types'
 
 interface Props {
@@ -14,10 +14,18 @@ interface Props {
 
 // Playback advances in small steps so the rider glides rather than teleports.
 const FRAME_MS = 60
-const SLOTS_PER_FRAME = 0.09
 
 /** One minute, as a fraction of a quarter-hour slot. */
 const MINUTE = 1 / 15
+
+/**
+ * Forecast minutes per second of playback, at single speed.
+ *
+ * Chosen so a ride of an hour or so takes about ten seconds to watch, which is
+ * the pace at which the rider marker reads as moving rather than jumping.
+ */
+const MINUTES_PER_SECOND = 6
+const SPEEDS = [1, 2, 4] as const
 
 export function TimeSlider({
   field,
@@ -29,17 +37,25 @@ export function TimeSlider({
   rideEnd,
 }: Props) {
   const last = field.slots.length - 1
+  const [speed, setSpeed] = useState<number>(SPEEDS[0])
   const slotRef = useRef(slot)
   slotRef.current = slot
 
+  // Looping back to the departure keeps the rider in view; without a ride to
+  // follow, the whole day is the thing being watched.
+  const loopTo = rideStart ? slotIndexAt(field, rideStart) : 0
+
   useEffect(() => {
     if (!playing) return
+
+    const perFrame = ((MINUTES_PER_SECOND * speed) / 15) * (FRAME_MS / 1000)
     const timer = window.setInterval(() => {
-      const next = slotRef.current + SLOTS_PER_FRAME
-      onSlotChange(next >= last ? 0 : next)
+      const next = slotRef.current + perFrame
+      onSlotChange(next >= last ? loopTo : next)
     }, FRAME_MS)
+
     return () => window.clearInterval(timer)
-  }, [playing, last, onSlotChange])
+  }, [playing, last, speed, loopTo, onSlotChange])
 
   const current = timeAtSlot(field, slot)
   const rideRange = rideWindow(field, rideStart, rideEnd)
@@ -70,8 +86,36 @@ export function TimeSlider({
             <span className="font-semibold tabular-nums">
               {current.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
             </span>
-            <span className="truncate text-xs opacity-50">
-              {current.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+            <span className="flex items-baseline gap-2">
+              <span className="hidden truncate text-xs opacity-50 sm:inline">
+                {current.toLocaleDateString(undefined, {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                })}
+              </span>
+              <span
+                role="radiogroup"
+                aria-label="Abspielgeschwindigkeit"
+                className="inline-flex gap-0.5 rounded-full bg-base-200 p-0.5"
+              >
+                {SPEEDS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={speed === option}
+                    onClick={() => setSpeed(option)}
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums transition-colors ${
+                      speed === option
+                        ? 'bg-base-100 text-base-content shadow-sm'
+                        : 'text-base-content/40 hover:text-base-content/70'
+                    }`}
+                  >
+                    {option}&times;
+                  </button>
+                ))}
+              </span>
             </span>
           </div>
 
