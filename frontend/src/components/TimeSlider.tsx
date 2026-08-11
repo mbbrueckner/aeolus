@@ -24,7 +24,7 @@ const MINUTE = 1 / 15
  * Chosen so a ride of an hour or so takes about ten seconds to watch, which is
  * the pace at which the rider marker reads as moving rather than jumping.
  */
-const MINUTES_PER_SECOND = 6
+const MINUTES_PER_SECOND = 3.5
 const SPEEDS = [1, 2, 4] as const
 
 export function TimeSlider({
