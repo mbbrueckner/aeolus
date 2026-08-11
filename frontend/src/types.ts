@@ -5,6 +5,8 @@ export interface Segment {
   coordinates: [number, number][]
   point: [number, number]
   time: string | null
+  entry_time: string | null
+  exit_time: string | null
   distance_km: number
   start_distance_km: number
   mid_distance_km: number

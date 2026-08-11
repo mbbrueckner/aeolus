@@ -37,11 +37,13 @@ function makeField(
   }
 }
 
-function segment(time: string, midKm: number): Segment {
+function segment(time: string, midKm: number, entry?: string, exit?: string): Segment {
   return {
     coordinates: [],
     point: [48, 11],
     time,
+    entry_time: entry ?? null,
+    exit_time: exit ?? null,
     distance_km: 1,
     start_distance_km: midKm - 0.5,
     mid_distance_km: midKm,
@@ -266,5 +268,34 @@ describe('slot positions are continuous', () => {
     const oneMinute = timeAtSlot(field, 1 / 15).getTime()
 
     expect(oneMinute - start).toBe(60_000)
+  })
+})
+
+describe('the rider is pinned to both ends of the route', () => {
+  const segments = [
+    segment('2026-08-12T10:05:00Z', 2, '2026-08-12T10:00:00Z', '2026-08-12T10:10:00Z'),
+    segment('2026-08-12T10:55:00Z', 22, '2026-08-12T10:10:00Z', '2026-08-12T11:00:00Z'),
+  ]
+
+  it('starts at kilometre zero at the departure time', () => {
+    const km = distanceAtTime(segments, new Date('2026-08-12T10:00:00Z'))
+    expect(km).toBeCloseTo(segments[0].start_distance_km)
+  })
+
+  it('reaches the end of the route at the finish time', () => {
+    const final = segments[1]
+    const km = distanceAtTime(segments, new Date('2026-08-12T11:00:00Z'))
+    expect(km).toBeCloseTo(final.start_distance_km + final.distance_km)
+  })
+
+  it('does not run past the end afterwards', () => {
+    const final = segments[1]
+    const km = distanceAtTime(segments, new Date('2026-08-12T18:00:00Z'))
+    expect(km).toBeCloseTo(final.start_distance_km + final.distance_km)
+  })
+
+  it('still works when only midpoints are known', () => {
+    const bare = [segment('2026-08-12T10:00:00Z', 2), segment('2026-08-12T11:00:00Z', 22)]
+    expect(distanceAtTime(bare, new Date('2026-08-12T10:30:00Z'))).toBeCloseTo(12)
   })
 })

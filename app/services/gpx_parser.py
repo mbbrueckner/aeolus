@@ -166,8 +166,17 @@ def cluster_segments(
                 gradient = _cluster_gradient(current_cluster_segments)
                 cluster_speed_m_per_s = _estimate_speed(avg_speed_kmh, gradient) * 1000.0 / 3600.0
                 timestamp = _cluster_timestamp(start_time, cumulative_time_s, current_cluster_length, cluster_speed_m_per_s)
-                clusters.append(_build_cluster(current_cluster_segments, current_cluster_bearing, timestamp))
-                cumulative_time_s += current_cluster_length / cluster_speed_m_per_s
+                duration_s = current_cluster_length / cluster_speed_m_per_s
+                clusters.append(
+                    _build_cluster(
+                        current_cluster_segments,
+                        current_cluster_bearing,
+                        timestamp,
+                        _offset(start_time, cumulative_time_s),
+                        _offset(start_time, cumulative_time_s + duration_s),
+                    )
+                )
+                cumulative_time_s += duration_s
                 current_cluster_segments = [seg]
                 current_cluster_length = segment_length
                 current_cluster_bearing = segment_bearing
@@ -176,7 +185,16 @@ def cluster_segments(
         gradient = _cluster_gradient(current_cluster_segments)
         cluster_speed_m_per_s = _estimate_speed(avg_speed_kmh, gradient) * 1000.0 / 3600.0
         timestamp = _cluster_timestamp(start_time, cumulative_time_s, current_cluster_length, cluster_speed_m_per_s)
-        clusters.append(_build_cluster(current_cluster_segments, current_cluster_bearing, timestamp))
+        duration_s = current_cluster_length / cluster_speed_m_per_s
+        clusters.append(
+            _build_cluster(
+                current_cluster_segments,
+                current_cluster_bearing,
+                timestamp,
+                _offset(start_time, cumulative_time_s),
+                _offset(start_time, cumulative_time_s + duration_s),
+            )
+        )
 
     return clusters
 
@@ -396,7 +414,26 @@ def _cluster_timestamp(
     return start_time + timedelta(seconds=elapsed_s)
 
 
-def _build_cluster(segments: list[Segment], mean_bearing: float, timestamp: datetime | None = None) -> SegmentCluster:
+def _offset(start_time: datetime | None, elapsed_s: float) -> datetime | None:
+    """Add elapsed seconds to the departure time.
+
+    Args:
+        start_time: Departure time, or None if the route is not being timed.
+        elapsed_s: Seconds since departure.
+
+    Returns:
+        The resulting time, or None.
+    """
+    return start_time + timedelta(seconds=elapsed_s) if start_time else None
+
+
+def _build_cluster(
+    segments: list[Segment],
+    mean_bearing: float,
+    timestamp: datetime | None = None,
+    entry_time: datetime | None = None,
+    exit_time: datetime | None = None,
+) -> SegmentCluster:
     """Build a SegmentCluster from a list of segments.
 
     The representative point is the geographic midpoint of the middle segment.
@@ -405,6 +442,8 @@ def _build_cluster(segments: list[Segment], mean_bearing: float, timestamp: date
         segments: Non-empty list of Segments belonging to this cluster.
         mean_bearing: Average bearing of the segments in degrees (0–360).
         timestamp: Precomputed timestamp for the representative point.
+        entry_time: When the rider reaches the start of the cluster.
+        exit_time: When the rider leaves it.
 
     Returns:
         A SegmentCluster representing the group.
@@ -430,6 +469,8 @@ def _build_cluster(segments: list[Segment], mean_bearing: float, timestamp: date
         segments=segments,
         mean_bearing=mean_bearing,
         representative_point=representative_point,
+        entry_time=entry_time,
+        exit_time=exit_time,
     )
 
 

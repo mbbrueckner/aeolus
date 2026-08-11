@@ -291,6 +291,8 @@ def _segment_payload(
         "start_distance_km": start_km,
         "mid_distance_km": start_km + cluster.total_distance_m / 2000.0,
         "bearing_deg": cluster.mean_bearing,
+        "entry_time": _isoformat(cluster.entry_time),
+        "exit_time": _isoformat(cluster.exit_time),
         "time": None,
         "wind_speed_km_h": None,
         "wind_direction_deg": None,

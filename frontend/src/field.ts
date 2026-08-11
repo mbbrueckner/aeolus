@@ -241,13 +241,7 @@ function cell(axis: number[], value: number) {
  * the same gradient-aware speed estimate rather than assuming a flat pace.
  */
 export function distanceAtTime(segments: Segment[], time: Date): number | null {
-  const known = segments
-    .filter((segment) => segment.time !== null)
-    .map((segment) => ({
-      at: new Date(segment.time as string).getTime(),
-      km: segment.mid_distance_km,
-    }))
-
+  const known = anchors(segments)
   if (known.length === 0) return null
 
   const target = time.getTime()
@@ -264,6 +258,32 @@ export function distanceAtTime(segments: Segment[], time: Date): number | null {
     }
   }
   return known[known.length - 1].km
+}
+
+/**
+ * Known (distance, time) pairs along the route, in order.
+ *
+ * The forecast timestamps sit at cluster midpoints, so on their own they place
+ * the rider half a cluster in at departure and leave them half a cluster short
+ * at the end. The entry and exit times pin both ends of the route.
+ */
+function anchors(segments: Segment[]): { at: number; km: number }[] {
+  const points: { at: number; km: number }[] = []
+
+  const add = (time: string | null, km: number) => {
+    if (time) points.push({ at: new Date(time).getTime(), km })
+  }
+
+  for (const segment of segments) {
+    add(segment.entry_time, segment.start_distance_km)
+    add(segment.time, segment.mid_distance_km)
+  }
+
+  const final = segments[segments.length - 1]
+  if (final) add(final.exit_time, final.start_distance_km + final.distance_km)
+
+  points.sort((a, b) => a.at - b.at)
+  return points.filter((point, i) => i === 0 || point.at !== points[i - 1].at)
 }
 
 /** Position along a polyline at a given distance, in kilometres. */

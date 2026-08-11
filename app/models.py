@@ -56,10 +56,16 @@ class SegmentCluster:
         segments: List of Segments in the cluster.
         mean_bearing: Average bearing of the segments in degrees (0–360).
         representative_point: A representative RoutePoint for the cluster (geographic midpoint of the middle segment).
+        entry_time: When the rider is expected to reach the start of this
+            cluster. The representative point's timestamp sits half a cluster
+            later, so it cannot anchor the ends of the route.
+        exit_time: When the rider is expected to leave this cluster.
     """
     segments: list[Segment]
     mean_bearing: float
     representative_point: RoutePoint
+    entry_time: datetime | None = None
+    exit_time: datetime | None = None
 
     @property
     def total_distance_m(self) -> float:
