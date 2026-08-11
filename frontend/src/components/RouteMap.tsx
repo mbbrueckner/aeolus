@@ -6,6 +6,7 @@ import {
   distanceAtTime,
   positionAtDistance,
   sampleField,
+  timeAtSlot,
   windDirectionDeg,
   windOnRoute,
 } from '../field'
@@ -36,7 +37,10 @@ export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChang
 
   const rideStart = firstTime(segments)
   const rideEnd = lastTime(segments)
-  const shownTime = field ? new Date(field.slots[slot] * 1000) : null
+  // The overlay and the background arrows are expensive to redraw, so they
+  // step in whole quarter hours; everything cheap follows the clock exactly.
+  const frame = Math.round(slot)
+  const shownTime = field ? timeAtSlot(field, slot) : null
   const riderPosition = useMemo(() => {
     if (!shownTime) return null
     const km = distanceAtTime(segments, shownTime)
@@ -55,8 +59,8 @@ export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChang
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
 
-        {field && <RainOverlay field={field} slot={slot} />}
-        {field && <WindArrows field={field} slot={slot} />}
+        {field && <RainOverlay field={field} slot={frame} />}
+        {field && <WindArrows field={field} slot={frame} />}
 
         {segments.map((segment, index) => (
           <Polyline

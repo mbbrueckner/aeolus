@@ -6,6 +6,7 @@ import {
   sampleField,
   slotIndexAt,
   windDirectionDeg,
+  timeAtSlot,
   windOnRoute,
   windSpeedKmH,
 } from './field'
@@ -210,5 +211,60 @@ describe('positionAtDistance', () => {
 
   it('returns null for an empty route', () => {
     expect(positionAtDistance([], 5)).toBeNull()
+  })
+})
+
+describe('time interpolation', () => {
+  it('blends between the two quarter hours around a fractional slot', () => {
+    const field = makeField([0, 0, 0, 0], { u: 0, v: 0 }, 2)
+    field.precipitation_mm_h = [
+      [[0, 10], [0, 10]],
+      [[0, 10], [0, 10]],
+    ]
+    expect(sampleField(field, 48.5, 11.5, 0.5).precipitationMmH).toBeCloseTo(5)
+    expect(sampleField(field, 48.5, 11.5, 0.25).precipitationMmH).toBeCloseTo(2.5)
+  })
+
+  it('matches the stored value on a whole slot', () => {
+    const field = makeField([0, 0, 0, 0], { u: 0, v: 0 }, 2)
+    field.precipitation_mm_h = [
+      [[3, 9], [3, 9]],
+      [[3, 9], [3, 9]],
+    ]
+    expect(sampleField(field, 48.5, 11.5, 0).precipitationMmH).toBeCloseTo(3)
+    expect(sampleField(field, 48.5, 11.5, 1).precipitationMmH).toBeCloseTo(9)
+  })
+
+  it('clamps past the last slot instead of running off the end', () => {
+    const field = makeField([0, 0, 0, 0], { u: 0, v: 0 }, 2)
+    field.precipitation_mm_h = [
+      [[3, 9], [3, 9]],
+      [[3, 9], [3, 9]],
+    ]
+    expect(sampleField(field, 48.5, 11.5, 5).precipitationMmH).toBeCloseTo(9)
+  })
+})
+
+describe('slot positions are continuous', () => {
+  it('returns a fraction between slots', () => {
+    const field = makeField([0, 0, 0, 0], { u: 0, v: 0 }, 4)
+    // 450 s is half of a 900 s slot.
+    expect(slotIndexAt(field, new Date((SLOT + 450) * 1000))).toBeCloseTo(0.5)
+  })
+
+  it('round trips through timeAtSlot', () => {
+    const field = makeField([0, 0, 0, 0], { u: 0, v: 0 }, 4)
+    const moment = new Date((SLOT + 1350) * 1000)
+    const slot = slotIndexAt(field, moment)
+
+    expect(timeAtSlot(field, slot).getTime()).toBe(moment.getTime())
+  })
+
+  it('gives a minute of clock time per sixtieth of a slot', () => {
+    const field = makeField([0, 0, 0, 0], { u: 0, v: 0 }, 4)
+    const start = timeAtSlot(field, 0).getTime()
+    const oneMinute = timeAtSlot(field, 1 / 15).getTime()
+
+    expect(oneMinute - start).toBe(60_000)
   })
 })

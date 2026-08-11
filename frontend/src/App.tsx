@@ -4,7 +4,7 @@ import { ControlPanel } from './components/ControlPanel'
 import { RouteMap } from './components/RouteMap'
 import { SummaryPanel } from './components/SummaryPanel'
 import { ThemeToggle } from './components/ThemeToggle'
-import { slotIndexAt, summariseAtSlot } from './field'
+import { slotIndexAt, summariseAtSlot, timeAtSlot } from './field'
 import { useTheme } from './theme'
 import type { Analysis } from './types'
 
@@ -24,7 +24,7 @@ export default function App() {
     setSlot(slotIndexAt(analysis.field, start ? new Date(start) : new Date()))
   }, [analysis])
 
-  const shownTime = analysis?.field ? new Date(analysis.field.slots[slot] * 1000) : null
+  const shownTime = analysis?.field ? timeAtSlot(analysis.field, slot) : null
   const live = useMemo(() => {
     if (!analysis?.field) return null
     return summariseAtSlot(analysis.segments, analysis.field, slot)

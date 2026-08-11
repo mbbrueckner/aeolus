@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { timeAtSlot } from '../field'
 import type { Field } from '../types'
 
 interface Props {
@@ -11,7 +12,12 @@ interface Props {
   rideEnd: Date | null
 }
 
-const FRAME_MS = 550
+// Playback advances in small steps so the rider glides rather than teleports.
+const FRAME_MS = 60
+const SLOTS_PER_FRAME = 0.09
+
+/** One minute, as a fraction of a quarter-hour slot. */
+const MINUTE = 1 / 15
 
 export function TimeSlider({
   field,
@@ -29,12 +35,13 @@ export function TimeSlider({
   useEffect(() => {
     if (!playing) return
     const timer = window.setInterval(() => {
-      onSlotChange(slotRef.current >= last ? 0 : slotRef.current + 1)
+      const next = slotRef.current + SLOTS_PER_FRAME
+      onSlotChange(next >= last ? 0 : next)
     }, FRAME_MS)
     return () => window.clearInterval(timer)
   }, [playing, last, onSlotChange])
 
-  const current = new Date(field.slots[slot] * 1000)
+  const current = timeAtSlot(field, slot)
   const rideRange = rideWindow(field, rideStart, rideEnd)
 
   return (
@@ -83,7 +90,7 @@ export function TimeSlider({
               type="range"
               min={0}
               max={last}
-              step={1}
+              step={MINUTE}
               value={slot}
               aria-label="Uhrzeit"
               className="range range-primary range-xs relative w-full"

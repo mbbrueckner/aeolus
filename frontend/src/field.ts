@@ -133,20 +133,32 @@ export function sampleProbability(field: Field, lat: number, lon: number, slot: 
   return { precipitationProbability: sampleField(stand, lat, lon, slot).precipitationMmH }
 }
 
-/** Index of the slot covering a moment, clamped to the field's range. */
+/**
+ * Position of a moment on the slot axis, clamped to the field's range.
+ *
+ * The result is fractional: 3.5 means halfway between the fourth and fifth
+ * quarter hour.
+ */
 export function slotIndexAt(field: Field, time: Date): number {
-  const unix = time.getTime() / 1000
-  let nearest = 0
-  let best = Infinity
+  const last = field.slots.length - 1
+  if (last < 1) return 0
 
-  for (let i = 0; i < field.slots.length; i += 1) {
-    const distance = Math.abs(field.slots[i] - unix)
-    if (distance < best) {
-      best = distance
-      nearest = i
-    }
-  }
-  return nearest
+  const unix = time.getTime() / 1000
+  const step = field.slots[1] - field.slots[0]
+  const position = (unix - field.slots[0]) / step
+
+  return Math.min(last, Math.max(0, position))
+}
+
+/** The moment a fractional slot position stands for. */
+export function timeAtSlot(field: Field, slot: number): Date {
+  const last = field.slots.length - 1
+  if (last < 0) return new Date()
+  if (last < 1) return new Date(field.slots[0] * 1000)
+
+  const step = field.slots[1] - field.slots[0]
+  const clamped = Math.min(last, Math.max(0, slot))
+  return new Date((field.slots[0] + clamped * step) * 1000)
 }
 
 /**
@@ -163,15 +175,27 @@ export function sampleField(
 ): FieldSample {
   const { row, column, rowWeight, columnWeight } = locate(field, lat, lon)
 
-  const read = (grid: number[][][]) => {
-    const topLeft = grid[row][column][slot]
-    const topRight = grid[row][column + 1][slot]
-    const bottomLeft = grid[row + 1][column][slot]
-    const bottomRight = grid[row + 1][column + 1][slot]
+  // A fractional slot blends the two quarter hours around it, so scrubbing the
+  // clock moves things continuously instead of in fifteen-minute jumps.
+  const last = field.slots.length - 1
+  const before = Math.max(0, Math.min(last, Math.floor(slot)))
+  const after = Math.min(last, before + 1)
+  const slotWeight = Math.min(1, Math.max(0, slot - before))
 
-    const top = topLeft + (topRight - topLeft) * columnWeight
-    const bottom = bottomLeft + (bottomRight - bottomLeft) * columnWeight
-    return top + (bottom - top) * rowWeight
+  const read = (grid: number[][][]) => {
+    const at = (time: number) => {
+      const topLeft = grid[row][column][time]
+      const topRight = grid[row][column + 1][time]
+      const bottomLeft = grid[row + 1][column][time]
+      const bottomRight = grid[row + 1][column + 1][time]
+
+      const top = topLeft + (topRight - topLeft) * columnWeight
+      const bottom = bottomLeft + (bottomRight - bottomLeft) * columnWeight
+      return top + (bottom - top) * rowWeight
+    }
+
+    const early = at(before)
+    return slotWeight === 0 ? early : early + (at(after) - early) * slotWeight
   }
 
   return {
