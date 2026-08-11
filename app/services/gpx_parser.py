@@ -37,7 +37,7 @@ def get_clustered_route(file_content: bytes, avg_speed_kmh: float, start_time: d
     """
     track = parse_track(file_content)
     points = _simplify(track)
-    segments = split_into_segments(points)
+    segments = split_into_segments(points, track)
     clusters = cluster_segments(segments, avg_speed_kmh, start_time)
     return ClusteredRoute(clusters=clusters, track=track)
 
@@ -85,16 +85,28 @@ def parse_gpx(file_content: bytes) -> list[RoutePoint]:
     return _simplify(parse_track(file_content))
 
 
-def split_into_segments(points: list[RoutePoint]) -> list[Segment]:
+def split_into_segments(
+    points: list[RoutePoint],
+    track: list[RoutePoint] | None = None,
+) -> list[Segment]:
     """Split an ordered list of RoutePoints into consecutive Segments.
+
+    Bearings come from the simplified points, which is what clustering wants.
+    Distances are measured along the original track when one is given: a
+    straight line between two simplified points cuts every bend between them,
+    which on a winding route adds up to several percent.
 
     Args:
         points: Ordered list of RoutePoints representing a route.
+        track: The unsimplified track the points came from, for measuring
+            distance along the road rather than across its corners.
 
     Returns:
         List of Segments, each annotated with bearing and distance.
         Contains len(points) - 1 entries.
     """
+    cumulative = _cumulative_distances(track) if track else None
+
     segments = []
     for p1, p2 in zip(points[:-1], points[1:]):
         segments.append(
@@ -102,10 +114,50 @@ def split_into_segments(points: list[RoutePoint]) -> list[Segment]:
                 start=p1,
                 end=p2,
                 bearing_deg=_bearing(p1, p2),
-                distance_m=_haversine(p1, p2)
+                distance_m=_travelled(p1, p2, cumulative),
             )
         )
     return segments
+
+
+def _cumulative_distances(track: list[RoutePoint]) -> list[float]:
+    """Distance from the start of the track to each of its points.
+
+    Args:
+        track: The unsimplified track.
+
+    Returns:
+        Metres travelled up to each point, starting at zero.
+    """
+    covered = [0.0]
+    for a, b in zip(track, track[1:]):
+        covered.append(covered[-1] + _haversine(a, b))
+    return covered
+
+
+def _travelled(
+    start: RoutePoint,
+    end: RoutePoint,
+    cumulative: list[float] | None,
+) -> float:
+    """Distance actually ridden between two points.
+
+    Args:
+        start: First point.
+        end: Second point.
+        cumulative: Distances along the original track, or None to measure
+            straight between the two points.
+
+    Returns:
+        Distance in metres.
+    """
+    if cumulative is None or start.track_index is None or end.track_index is None:
+        return _haversine(start, end)
+
+    if not (0 <= start.track_index < len(cumulative) and 0 <= end.track_index < len(cumulative)):
+        return _haversine(start, end)
+
+    return cumulative[end.track_index] - cumulative[start.track_index]
 
 
 def cluster_segments(

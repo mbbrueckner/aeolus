@@ -244,3 +244,62 @@ class TestClusterSegments:
         clusters = cluster_segments(segs)
         assert clusters[0].representative_point is not None
         assert isinstance(clusters[0].representative_point, RoutePoint)
+
+
+# --- distances follow the recorded track ---
+
+class TestTrackDistances:
+    def zigzag(self, n=60, amplitude=0.0002):
+        """A track that weaves too finely for simplification to keep.
+
+        The amplitude sits below EPSILON on purpose: RDP throws these wiggles
+        away, but the rider still rode every one of them.
+        """
+        points = []
+        for i in range(n):
+            lat = 48.0 + i * 0.001
+            lon = 11.0 + (amplitude if i % 2 else -amplitude)
+            points.append((round(lat, 6), round(lon, 6), 500.0, f"2026-01-01T10:{i:02d}:00Z"))
+        return make_gpx_bytes(points)
+
+    def test_segment_distance_follows_the_track(self):
+        """Simplification drops the zigzag, but the rider still rode it."""
+        from app.services.gpx_parser import parse_track, split_into_segments, _simplify
+
+        track = parse_track(self.zigzag())
+        simplified = _simplify(track)
+
+        straight = sum(s.distance_m for s in split_into_segments(simplified))
+        ridden = sum(s.distance_m for s in split_into_segments(simplified, track))
+
+        assert ridden > straight
+
+    def test_total_matches_the_raw_track(self):
+        from app.services.gpx_parser import (
+            _haversine, parse_track, split_into_segments, _simplify,
+        )
+
+        track = parse_track(self.zigzag())
+        raw = sum(_haversine(a, b) for a, b in zip(track, track[1:]))
+        measured = sum(s.distance_m for s in split_into_segments(_simplify(track), track))
+
+        assert measured == pytest.approx(raw, rel=1e-9)
+
+    def test_clustered_route_totals_the_raw_track(self):
+        from app.services.gpx_parser import _haversine, get_clustered_route, parse_track
+
+        gpx = self.zigzag()
+        track = parse_track(gpx)
+        raw = sum(_haversine(a, b) for a, b in zip(track, track[1:]))
+
+        route = get_clustered_route(gpx, 20.0, datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc))
+
+        assert route.total_distance_m == pytest.approx(raw, rel=1e-9)
+
+    def test_falls_back_without_a_track(self):
+        from app.services.gpx_parser import parse_track, split_into_segments
+
+        track = parse_track(self.zigzag())
+        segments = split_into_segments(track)
+
+        assert all(s.distance_m > 0 for s in segments)
