@@ -73,7 +73,7 @@ def test_speed_above_range_is_rejected():
 def test_unparseable_time_is_rejected():
     response = post(start_time="letzten Dienstag")
     assert response.status_code == 422
-    assert "ISO 8601" in response.json()["detail"]
+    assert response.json()["detail"]["code"] == "bad_start_time"
 
 def test_empty_upload_is_rejected():
     response = post(gpx_bytes=b"")
@@ -82,7 +82,17 @@ def test_empty_upload_is_rejected():
 def test_garbage_gpx_is_rejected_with_a_message():
     response = post(gpx_bytes=b"this is not gpx")
     assert response.status_code == 422
-    assert response.json()["detail"]
+    assert response.json()["detail"]["code"] == "unreadable_route"
+
+def test_errors_carry_a_code_and_a_fallback_message():
+    """The code is what the front end translates; the message is a fallback."""
+    detail = post(gpx_bytes=b"").json()["detail"]
+
+    assert detail["code"] == "empty_upload"
+    assert detail["message"]
+
+def test_empty_route_has_its_own_code():
+    assert post(analysis_of([])).json()["detail"]["code"] == "empty_route"
 
 def test_route_without_clusters_is_rejected():
     response = post(analysis_of([]))

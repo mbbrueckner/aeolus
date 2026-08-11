@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { DepartureField } from './DepartureField'
 
 interface Props {
@@ -14,6 +15,7 @@ function nextQuarterHour(): Date {
 }
 
 export function ControlPanel({ busy, onSubmit }: Props) {
+  const { t } = useTranslation()
   const [file, setFile] = useState<File | null>(null)
   const [planRide, setPlanRide] = useState(false)
   const [speed, setSpeed] = useState(22)
@@ -72,7 +74,7 @@ export function ControlPanel({ busy, onSubmit }: Props) {
           <>
             <p className="truncate text-sm font-medium">{file.name}</p>
             <p className="mt-0.5 text-xs opacity-50">
-              {(file.size / 1024).toFixed(0)} kB · andere Datei wählen
+              {t('controls.changeFile', { size: (file.size / 1024).toFixed(0) })}
             </p>
           </>
         ) : (
@@ -91,8 +93,8 @@ export function ControlPanel({ busy, onSubmit }: Props) {
               <path d="M12 15V4M12 4 8 8M12 4l4 4" />
               <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
             </svg>
-            <p className="text-sm font-medium">GPX-Datei hierher ziehen</p>
-            <p className="mt-0.5 text-xs opacity-50">oder klicken zum Auswählen</p>
+            <p className="text-sm font-medium">{t('controls.drop')}</p>
+            <p className="mt-0.5 text-xs opacity-50">{t('controls.dropHint')}</p>
           </>
         )}
       </div>
@@ -106,11 +108,9 @@ export function ControlPanel({ busy, onSubmit }: Props) {
             className="toggle toggle-primary toggle-sm"
           />
           <span className="flex-1">
-            <span className="block text-sm font-medium">Konkrete Fahrt planen</span>
+            <span className="block text-sm font-medium">{t('controls.planRide')}</span>
             <span className="block text-xs opacity-50">
-              {planRide
-                ? 'Zeigt zusätzlich, was dich wo erwartet'
-                : 'Ohne das siehst du nur die Wetterkarte der Route'}
+              {planRide ? t('controls.planRideOn') : t('controls.planRideOff')}
             </span>
           </span>
         </label>
@@ -121,7 +121,7 @@ export function ControlPanel({ busy, onSubmit }: Props) {
 
             <label className="block">
               <span className="mb-1.5 flex items-baseline justify-between text-sm font-medium">
-                <span className="opacity-75">Schnitt</span>
+                <span className="opacity-75">{t('controls.speed')}</span>
                 <span className="tabular-nums opacity-60">{speed.toFixed(1)} km/h</span>
               </span>
               <input
@@ -140,7 +140,7 @@ export function ControlPanel({ busy, onSubmit }: Props) {
 
       <button type="submit" className="btn btn-primary w-full" disabled={!file || busy}>
         {busy && <span className="loading loading-spinner loading-sm" />}
-        {busy ? 'Vorhersage wird geholt …' : 'Route anzeigen'}
+        {busy ? t('controls.submitting') : t('controls.submit')}
       </button>
     </form>
   )

@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { analyseRoute } from './api'
 import { ControlPanel } from './components/ControlPanel'
 import { RouteMap } from './components/RouteMap'
 import { SummaryPanel } from './components/SummaryPanel'
+import { LanguageToggle } from './components/LanguageToggle'
 import { ThemeToggle } from './components/ThemeToggle'
 import { slotIndexAt, summariseAtSlot, timeAtSlot } from './field'
 import { useTheme } from './theme'
 import type { Analysis } from './types'
 
 export default function App() {
+  const { t } = useTranslation()
   const { preference, setPreference } = useTheme()
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -60,10 +63,13 @@ export default function App() {
             <WindMark />
             <div>
               <h1 className="text-xl leading-tight font-semibold tracking-tight">Aeolus</h1>
-              <p className="text-xs opacity-55">Wetter entlang deiner Route</p>
+              <p className="text-xs opacity-55">{t('app.tagline')}</p>
             </div>
           </div>
-          <ThemeToggle preference={preference} onChange={setPreference} />
+          <div className="flex flex-col items-end gap-1.5">
+            <ThemeToggle preference={preference} onChange={setPreference} />
+            <LanguageToggle />
+          </div>
         </header>
 
         <ControlPanel busy={busy} onSubmit={handleSubmit} />
@@ -82,17 +88,20 @@ export default function App() {
         )}
 
         <footer className="mt-auto space-y-2 border-t border-base-300/60 pt-4 text-[11px] leading-relaxed opacity-45">
+          <p>{t('app.disclaimer')}</p>
           <p>
-            Wo dich der Wind auf der Route trifft, ist gegen aufgezeichnete Fahrten
-            geprüft. Wie stark er sich anfühlt, hängt an Hecken, Senken und Bebauung und
-            lässt sich aus einer Vorhersage nicht zuverlässig ableiten.
-          </p>
-          <p>
-            Wetter von{' '}
-            <a href="https://open-meteo.com/" target="_blank" rel="noopener" className="link">
-              Open-Meteo
-            </a>
-            , Karte von OpenStreetMap.
+            <Trans
+              i18nKey="app.attribution"
+              components={[
+                <a
+                  key="open-meteo"
+                  href="https://open-meteo.com/"
+                  target="_blank"
+                  rel="noopener"
+                  className="link"
+                />,
+              ]}
+            />
           </p>
         </footer>
       </aside>
@@ -135,6 +144,8 @@ function WindMark() {
 }
 
 function EmptyState({ busy }: { busy: boolean }) {
+  const { t } = useTranslation()
+
   return (
     <div className="flex h-full items-center justify-center bg-gradient-to-b from-base-200 to-base-300/40 p-8 text-center">
       <div className="max-w-xs space-y-3">
@@ -157,12 +168,9 @@ function EmptyState({ busy }: { busy: boolean }) {
           </svg>
         )}
         <h2 className="text-base font-medium opacity-70">
-          {busy ? 'Route wird ausgewertet …' : 'Lade eine GPX-Datei hoch'}
+          {busy ? t('empty.analysing') : t('empty.prompt')}
         </h2>
-        <p className="text-sm leading-relaxed opacity-45">
-          Du bekommst eine Wetterkarte deiner Route, die du über den Tag durchspielen
-          kannst. Abfahrtszeit und Schnitt sind optional.
-        </p>
+        <p className="text-sm leading-relaxed opacity-45">{t('empty.hint')}</p>
       </div>
     </div>
   )

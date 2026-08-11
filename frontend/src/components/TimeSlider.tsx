@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { slotIndexAt, timeAtSlot } from '../field'
 import type { Field } from '../types'
 
@@ -36,6 +37,7 @@ export function TimeSlider({
   rideStart,
   rideEnd,
 }: Props) {
+  const { t, i18n } = useTranslation()
   const last = field.slots.length - 1
   const [speed, setSpeed] = useState<number>(SPEEDS[0])
   const slotRef = useRef(slot)
@@ -66,7 +68,7 @@ export function TimeSlider({
         <button
           type="button"
           onClick={() => onPlayingChange(!playing)}
-          aria-label={playing ? 'Pause' : 'Abspielen'}
+          aria-label={playing ? t('timeline.pause') : t('timeline.play')}
           className="btn btn-circle btn-primary btn-sm shrink-0"
         >
           {playing ? (
@@ -84,11 +86,11 @@ export function TimeSlider({
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-baseline justify-between gap-2 text-sm">
             <span className="font-semibold tabular-nums">
-              {current.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+              {current.toLocaleTimeString(i18n.resolvedLanguage, { hour: '2-digit', minute: '2-digit' })}
             </span>
             <span className="flex items-baseline gap-2">
               <span className="hidden truncate text-xs opacity-50 sm:inline">
-                {current.toLocaleDateString(undefined, {
+                {current.toLocaleDateString(i18n.resolvedLanguage, {
                   weekday: 'short',
                   day: 'numeric',
                   month: 'short',
@@ -96,7 +98,7 @@ export function TimeSlider({
               </span>
               <span
                 role="radiogroup"
-                aria-label="Abspielgeschwindigkeit"
+                aria-label={t('timeline.speed')}
                 className="inline-flex gap-0.5 rounded-full bg-base-200 p-0.5"
               >
                 {SPEEDS.map((option) => (
@@ -136,7 +138,7 @@ export function TimeSlider({
               max={last}
               step={MINUTE}
               value={slot}
-              aria-label="Uhrzeit"
+              aria-label={t('timeline.time')}
               className="range range-primary range-xs relative w-full"
               onChange={(event) => {
                 onPlayingChange(false)
@@ -146,9 +148,11 @@ export function TimeSlider({
           </div>
 
           <div className="mt-0.5 flex justify-between text-[10px] opacity-40">
-            <span>{formatSlot(field.slots[0])}</span>
-            {rideRange && <span className="text-primary opacity-80">deine Fahrt</span>}
-            <span>{formatSlot(field.slots[last])}</span>
+            <span>{formatSlot(field.slots[0], i18n.resolvedLanguage)}</span>
+            {rideRange && (
+              <span className="text-primary opacity-80">{t('timeline.yourRide')}</span>
+            )}
+            <span>{formatSlot(field.slots[last], i18n.resolvedLanguage)}</span>
           </div>
         </div>
       </div>
@@ -171,8 +175,8 @@ function rideWindow(field: Field, start: Date | null, end: Date | null) {
   return { from: Math.max(0, from), to: Math.min(1, to) }
 }
 
-function formatSlot(unix: number): string {
-  return new Date(unix * 1000).toLocaleTimeString(undefined, {
+function formatSlot(unix: number, language: string | undefined): string {
+  return new Date(unix * 1000).toLocaleTimeString(language, {
     hour: '2-digit',
     minute: '2-digit',
   })

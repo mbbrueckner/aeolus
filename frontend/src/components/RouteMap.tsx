@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { Analysis, Field, Segment } from '../types'
@@ -12,9 +13,9 @@ import {
 } from '../field'
 import {
   ALIGNMENT_COLOUR,
-  ALIGNMENT_LABEL,
+  ALIGNMENT_KEY,
   RAIN_COLOUR,
-  RAIN_LABEL,
+  RAIN_KEY,
   arrowRotation,
   formatTime,
   isNotable,
@@ -121,9 +122,11 @@ function colourAt(analysis: Analysis, segment: Segment, slot: number): string {
 }
 
 function Legend() {
+  const { t } = useTranslation()
+
   return (
     <div className="pointer-events-none absolute top-3 right-3 z-1000 rounded-box border border-base-300/60 bg-base-100/92 px-3.5 py-2.5 text-xs shadow-lg backdrop-blur-sm">
-      <p className="mb-1.5 font-medium opacity-55">Wind auf der Route</p>
+      <p className="mb-1.5 font-medium opacity-55">{t('map.windLegend')}</p>
       <ul className="space-y-1">
         {(['headwind', 'crosswind', 'tailwind'] as const).map((alignment) => (
           <li key={alignment} className="flex items-center gap-2">
@@ -131,16 +134,16 @@ function Legend() {
               className="h-1 w-6 rounded-full"
               style={{ background: ALIGNMENT_COLOUR[alignment] }}
             />
-            {ALIGNMENT_LABEL[alignment]}
+            {t(ALIGNMENT_KEY[alignment])}
           </li>
         ))}
         <li className="flex items-center gap-2 opacity-60">
           <span className="h-1 w-6 rounded-full bg-slate-400" />
-          kaum Wind
+          {t('wind.calm')}
         </li>
       </ul>
 
-      <p className="mt-2.5 mb-1.5 font-medium opacity-55">Niederschlag</p>
+      <p className="mt-2.5 mb-1.5 font-medium opacity-55">{t('map.rainLegend')}</p>
       <div className="flex items-center gap-1.5">
         <span
           className="h-2.5 w-16 rounded-full"
@@ -148,53 +151,68 @@ function Legend() {
             background: `linear-gradient(90deg, ${RAIN_COLOUR.light}, ${RAIN_COLOUR.moderate}, ${RAIN_COLOUR.heavy})`,
           }}
         />
-        <span className="opacity-60">leicht → stark</span>
+        <span className="opacity-60">{t('rain.scale')}</span>
       </div>
     </div>
   )
 }
 
 function SegmentPopup({ segment }: { segment: Segment }) {
+  const { t } = useTranslation()
+
   return (
     <div className="min-w-52 text-sm">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <span className="font-semibold">
-          {segment.time ? formatTime(segment.time) : `km ${segment.mid_distance_km.toFixed(1)}`}
+          {segment.time
+            ? formatTime(segment.time)
+            : t('map.atKm', { km: segment.mid_distance_km.toFixed(1) })}
         </span>
         <span className="opacity-55">
-          {segment.time ? `bei km ${segment.mid_distance_km.toFixed(1)}` : 'Streckenabschnitt'}
+          {segment.time
+            ? t('map.atKm', { km: segment.mid_distance_km.toFixed(1) })
+            : t('map.section')}
         </span>
       </div>
 
       {segment.wind_speed_km_h === null ? (
-        <p className="text-xs leading-relaxed opacity-55">
-          Gib Abfahrtszeit und Schnitt an, um zu sehen, was dich hier erwartet. Die Karte
-          zeigt derweil das Wetter zur eingestellten Uhrzeit.
-        </p>
+        <p className="text-xs leading-relaxed opacity-55">{t('map.noRideHint')}</p>
       ) : (
         <>
           <dl className="space-y-1">
             <Row
-              label="Wind"
+              label={t('map.wind')}
               value={`${segment.wind_speed_km_h.toFixed(0)} km/h`}
-              accent={isNotable(segment) && segment.alignment ? ALIGNMENT_COLOUR[segment.alignment] : undefined}
-              note={isNotable(segment) && segment.alignment ? ALIGNMENT_LABEL[segment.alignment] : 'schwach'}
+              accent={
+                isNotable(segment) && segment.alignment
+                  ? ALIGNMENT_COLOUR[segment.alignment]
+                  : undefined
+              }
+              note={
+                isNotable(segment) && segment.alignment
+                  ? t(ALIGNMENT_KEY[segment.alignment])
+                  : t('wind.weak')
+              }
             />
-            <Row label="Böen" value={`${(segment.wind_gusts_km_h ?? 0).toFixed(0)} km/h`} />
+            <Row label={t('map.gusts')} value={`${(segment.wind_gusts_km_h ?? 0).toFixed(0)} km/h`} />
             <Row
-              label="Regen"
-              value={segment.rain_tier ? `${(segment.precipitation_mm_h ?? 0).toFixed(1)} mm/h` : 'trocken'}
+              label={t('map.rain')}
+              value={
+                segment.rain_tier
+                  ? `${(segment.precipitation_mm_h ?? 0).toFixed(1)} mm/h`
+                  : t('rain.dry')
+              }
               accent={segment.rain_tier ? RAIN_COLOUR[segment.rain_tier] : undefined}
-              note={segment.rain_tier ? RAIN_LABEL[segment.rain_tier] : undefined}
+              note={segment.rain_tier ? t(RAIN_KEY[segment.rain_tier]) : undefined}
             />
           </dl>
-          <p className="mt-2 text-[11px] opacity-45">Werte für deine geschätzte Ankunft hier.</p>
+          <p className="mt-2 text-[11px] opacity-45">{t('map.arrivalNote')}</p>
         </>
       )}
 
       {segment.unsafe && (
         <p className="mt-1.5 rounded-md bg-error/15 px-2 py-1 text-xs font-medium text-error">
-          Kritische Bedingungen
+          {t('map.unsafe')}
         </p>
       )}
     </div>

@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
+
 interface Props {
   value: Date
   onChange: (value: Date) => void
@@ -16,6 +19,7 @@ const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES
  * steps in.
  */
 export function DepartureField({ value, onChange, days = 7 }: Props) {
+  const { t } = useTranslation()
   const today = startOfDay(new Date())
   const chosenDay = startOfDay(value)
   const slot = Math.round((value.getTime() - chosenDay.getTime()) / (SLOT_MINUTES * 60_000))
@@ -41,7 +45,7 @@ export function DepartureField({ value, onChange, days = 7 }: Props) {
   return (
     <div className="space-y-3">
       <label className="block">
-        <span className="mb-1.5 block text-sm font-medium opacity-75">Tag</span>
+        <span className="mb-1.5 block text-sm font-medium opacity-75">{t('departure.day')}</span>
         <select
           className="select select-sm w-full"
           value={chosenDay.getTime()}
@@ -49,7 +53,7 @@ export function DepartureField({ value, onChange, days = 7 }: Props) {
         >
           {options.map((day, offset) => (
             <option key={day.getTime()} value={day.getTime()}>
-              {labelFor(day, offset)}
+              {labelFor(day, offset, t)}
             </option>
           ))}
         </select>
@@ -57,9 +61,9 @@ export function DepartureField({ value, onChange, days = 7 }: Props) {
 
       <label className="block">
         <span className="mb-1.5 flex items-baseline justify-between text-sm font-medium">
-          <span className="opacity-75">Uhrzeit</span>
+          <span className="opacity-75">{t('departure.time')}</span>
           <span className="tabular-nums opacity-60">
-            {value.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+            {value.toLocaleTimeString(i18n.resolvedLanguage, { hour: '2-digit', minute: '2-digit' })}
           </span>
         </span>
         <input
@@ -68,7 +72,7 @@ export function DepartureField({ value, onChange, days = 7 }: Props) {
           max={SLOTS_PER_DAY - 1}
           step={1}
           value={slot}
-          aria-label="Uhrzeit"
+          aria-label={t('departure.time')}
           className="range range-primary range-xs"
           onChange={(event) => setSlot(Number(event.target.value))}
         />
@@ -88,10 +92,10 @@ function startOfDay(date: Date): Date {
   return copy
 }
 
-function labelFor(day: Date, offset: number): string {
-  if (offset === 0) return 'Heute'
-  if (offset === 1) return 'Morgen'
-  return day.toLocaleDateString(undefined, {
+function labelFor(day: Date, offset: number, t: (key: 'departure.today' | 'departure.tomorrow') => string): string {
+  if (offset === 0) return t('departure.today')
+  if (offset === 1) return t('departure.tomorrow')
+  return day.toLocaleDateString(i18n.resolvedLanguage, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',

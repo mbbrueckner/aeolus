@@ -1,3 +1,4 @@
+import i18n from './i18n'
 import type { Alignment, RainTier, Segment } from './types'
 
 /**
@@ -6,16 +7,22 @@ import type { Alignment, RainTier, Segment } from './types'
  * The route is coloured by direction rather than by score, because direction
  * is the part the forecast actually predicts well.
  */
+export const ALIGNMENT_KEY = {
+  headwind: 'wind.headwind',
+  crosswind: 'wind.crosswind',
+  tailwind: 'wind.tailwind',
+} as const
+
+export const RAIN_KEY = {
+  light: 'rain.light',
+  moderate: 'rain.moderate',
+  heavy: 'rain.heavy',
+} as const
+
 export const ALIGNMENT_COLOUR: Record<Alignment, string> = {
   headwind: '#dc2626',
   crosswind: '#d97706',
   tailwind: '#16a34a',
-}
-
-export const ALIGNMENT_LABEL: Record<Alignment, string> = {
-  headwind: 'Gegenwind',
-  crosswind: 'Seitenwind',
-  tailwind: 'Rückenwind',
 }
 
 /**
@@ -27,12 +34,6 @@ export const RAIN_COLOUR: Record<RainTier, string> = {
   light: '#7dd3fc',
   moderate: '#38bdf8',
   heavy: '#2563eb',
-}
-
-export const RAIN_LABEL: Record<RainTier, string> = {
-  light: 'leichter Regen',
-  moderate: 'Regen',
-  heavy: 'Starkregen',
 }
 
 export const RAIN_WIDTH: Record<RainTier, number> = {
@@ -67,7 +68,7 @@ export function arrowRotation(windDirectionDeg: number): number {
 /** Format a timestamp as a local time of day. */
 export function formatTime(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString(undefined, {
+  return new Date(iso).toLocaleTimeString(i18n.resolvedLanguage, {
     hour: '2-digit',
     minute: '2-digit',
   })

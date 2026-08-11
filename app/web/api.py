@@ -37,6 +37,20 @@ from app.services.route_scorer import SegmentScore
 from app.services.summary import RouteSummary, rain_tier
 from app.services.weather_field import WeatherField, fetch_field, route_bounds
 
+def _fail(status: int, code: str, message: str) -> HTTPException:
+    """Build an error the front end can translate.
+
+    Args:
+        status: HTTP status code.
+        code: Stable identifier the client maps to a localised message.
+        message: English fallback, for clients that do not know the code.
+
+    Returns:
+        The exception to raise.
+    """
+    return HTTPException(status, {"code": code, "message": message})
+
+
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MIN_SPEED_KMH = 5.0
 MAX_SPEED_KMH = 60.0
@@ -97,10 +111,10 @@ async def analyze(
     except HTTPException:
         raise
     except Exception as error:
-        raise HTTPException(422, f"could not analyze this route: {error}")
+        raise _fail(422, "unreadable_route", f"could not analyze this route: {error}")
 
     if not route.clusters:
-        raise HTTPException(422, "the GPX file contains no usable track")
+        raise _fail(422, "empty_route", "the GPX file contains no usable track")
 
     payload = _to_payload(route, snapshots, scores, summary)
     payload["field"] = _fetch_field_for(route, reference)
@@ -121,9 +135,9 @@ async def _read_upload(gpx: UploadFile) -> bytes:
     """
     content = await gpx.read()
     if not content:
-        raise HTTPException(422, "the uploaded file is empty")
+        raise _fail(422, "empty_upload", "the uploaded file is empty")
     if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "the uploaded file is too large")
+        raise _fail(413, "too_large", "the uploaded file is too large")
     return content
 
 
@@ -144,7 +158,7 @@ def _parse_start_time(start_time: str | None) -> datetime | None:
     try:
         parsed = datetime.fromisoformat(start_time)
     except ValueError:
-        raise HTTPException(422, "start_time must be an ISO 8601 timestamp")
+        raise _fail(422, "bad_start_time", "start_time must be an ISO 8601 timestamp")
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
@@ -163,8 +177,10 @@ def _validate_speed(avg_speed_kmh: float | None) -> float | None:
     if avg_speed_kmh is None:
         return None
     if not MIN_SPEED_KMH <= avg_speed_kmh <= MAX_SPEED_KMH:
-        raise HTTPException(
-            422, f"avg_speed_kmh must be between {MIN_SPEED_KMH} and {MAX_SPEED_KMH}"
+        raise _fail(
+            422,
+            "bad_speed",
+            f"avg_speed_kmh must be between {MIN_SPEED_KMH} and {MAX_SPEED_KMH}",
         )
     return avg_speed_kmh
 

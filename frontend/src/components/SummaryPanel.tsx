@@ -1,6 +1,7 @@
+import { Trans, useTranslation } from 'react-i18next'
 import type { LiveSummary } from '../field'
 import type { RainTier, Summary } from '../types'
-import { ALIGNMENT_COLOUR, RAIN_COLOUR, RAIN_LABEL, formatKm, formatTime } from '../wind'
+import { ALIGNMENT_COLOUR, RAIN_COLOUR, RAIN_KEY, formatKm, formatTime } from '../wind'
 
 interface Props {
   live: LiveSummary | null
@@ -19,29 +20,36 @@ export function SummaryPanel({ live, shownTime, summary }: Props) {
 
 /** The whole route as it stands at the moment shown on the map. */
 function AtThisMoment({ live, shownTime }: { live: LiveSummary; shownTime: Date | null }) {
+  const { t } = useTranslation()
+
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">Auf der Route</h2>
+        <h2 className="text-sm font-semibold">{t('summary.onRoute')}</h2>
         <span className="text-xs opacity-50">
           {shownTime
-            ? `um ${shownTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
+            ? t('summary.at', {
+                time: shownTime.toLocaleTimeString(undefined, {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              })
             : ''}{' '}
           · {formatKm(live.totalKm)} km
         </span>
       </div>
 
       <div className="space-y-2.5">
-        <Bar label="Gegenwind" km={live.headwindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.headwind} />
-        <Bar label="Seitenwind" km={live.crosswindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.crosswind} />
-        <Bar label="Rückenwind" km={live.tailwindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.tailwind} />
-        <Bar label="kaum Wind" km={live.calmKm} total={live.totalKm} colour="currentColor" muted />
+        <Bar label={t('wind.headwind')} km={live.headwindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.headwind} />
+        <Bar label={t('wind.crosswind')} km={live.crosswindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.crosswind} />
+        <Bar label={t('wind.tailwind')} km={live.tailwindKm} total={live.totalKm} colour={ALIGNMENT_COLOUR.tailwind} />
+        <Bar label={t('wind.calm')} km={live.calmKm} total={live.totalKm} colour="currentColor" muted />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
-        <Tile label="Wind im Mittel" value={live.meanWindKmH.toFixed(0)} unit="km/h" />
+        <Tile label={t('summary.meanWind')} value={live.meanWindKmH.toFixed(0)} unit="km/h" />
         <Tile
-          label="Regenrisiko"
+          label={t('summary.rainRisk')}
           value={live.maxProbability.toFixed(0)}
           unit="%"
           muted={live.maxProbability < 15}
@@ -50,12 +58,15 @@ function AtThisMoment({ live, shownTime }: { live: LiveSummary; shownTime: Date 
 
       {live.rainKm > 0.05 ? (
         <p className="rounded-box border border-info/25 bg-info/8 px-3.5 py-2.5 text-sm text-info">
-          Regen auf <strong>{formatKm(live.rainKm)} km</strong>, bis{' '}
-          {live.maxRainMmH.toFixed(1)} mm/h
+          <Trans
+            i18nKey="summary.rainOnRoute"
+            values={{ km: formatKm(live.rainKm), peak: live.maxRainMmH.toFixed(1) }}
+            components={[<strong key="km" />]}
+          />
         </p>
       ) : (
         <p className="rounded-box border border-base-300/60 bg-base-200/40 px-3.5 py-2.5 text-sm opacity-60">
-          Gerade trocken auf der ganzen Route
+          {t('summary.dryEverywhere')}
         </p>
       )}
     </section>
@@ -64,31 +75,38 @@ function AtThisMoment({ live, shownTime }: { live: LiveSummary; shownTime: Date 
 
 /** What the rider is expected to meet, given a departure time and speed. */
 function OnYourRide({ summary }: { summary: Summary }) {
+  const { t } = useTranslation()
+
   return (
     <section className="space-y-4 rounded-box border border-primary/25 bg-primary/5 px-3.5 py-3.5">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-primary">Auf deiner Fahrt</h2>
-        <span className="text-xs opacity-55">an {formatTime(summary.arrival)}</span>
+        <h2 className="text-sm font-semibold text-primary">{t('summary.onRide')}</h2>
+        <span className="text-xs opacity-55">
+          {t('summary.arriving', { time: formatTime(summary.arrival) })}
+        </span>
       </div>
 
       <div className="space-y-2.5">
-        <Bar label="Gegenwind" km={summary.headwind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.headwind} />
-        <Bar label="Seitenwind" km={summary.crosswind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.crosswind} />
-        <Bar label="Rückenwind" km={summary.tailwind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.tailwind} />
+        <Bar label={t('wind.headwind')} km={summary.headwind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.headwind} />
+        <Bar label={t('wind.crosswind')} km={summary.crosswind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.crosswind} />
+        <Bar label={t('wind.tailwind')} km={summary.tailwind_km} total={summary.total_distance_km} colour={ALIGNMENT_COLOUR.tailwind} />
       </div>
 
       <RainSection summary={summary} />
 
       {summary.unsafe_km > 0.1 && (
         <p className="rounded-box border border-error/25 bg-error/10 px-3.5 py-2.5 text-sm text-error">
-          Auf <strong>{formatKm(summary.unsafe_km)} km</strong> sind die Bedingungen
-          kritisch — auf der Karte gestrichelt.
+          <Trans
+            i18nKey="summary.unsafe"
+            values={{ km: formatKm(summary.unsafe_km) }}
+            components={[<strong key="km" />]}
+          />
         </p>
       )}
 
       <details className="group rounded-box bg-base-200/60">
         <summary className="flex cursor-pointer list-none items-center justify-between px-3.5 py-2.5 text-sm">
-          <span className="opacity-70">Gesamtbewertung</span>
+          <span className="opacity-70">{t('summary.score')}</span>
           <span className="flex items-center gap-1.5 font-semibold tabular-nums">
             {summary.score >= 0 ? '+' : ''}
             {summary.score.toFixed(2)}
@@ -108,8 +126,7 @@ function OnYourRide({ summary }: { summary: Summary }) {
           </span>
         </summary>
         <p className="px-3.5 pb-3 text-xs leading-relaxed opacity-60">
-          Eine zusammenfassende Zahl von −1 bis +1. Sie ist noch nicht gegen echte
-          Fahrten kalibriert — verlass dich lieber auf die Kilometer oben.
+          {t('summary.scoreNote')}
         </p>
       </details>
     </section>
@@ -117,8 +134,10 @@ function OnYourRide({ summary }: { summary: Summary }) {
 }
 
 function RainSection({ summary }: { summary: Summary }) {
+  const { t } = useTranslation()
+
   if (summary.rain_km <= 0.05) {
-    return <p className="text-sm opacity-60">Durchgehend trocken</p>
+    return <p className="text-sm opacity-60">{t('summary.dryThroughout')}</p>
   }
 
   const tiers: { tier: RainTier; km: number }[] = [
@@ -131,8 +150,14 @@ function RainSection({ summary }: { summary: Summary }) {
     <div className="space-y-2 rounded-box border border-info/25 bg-info/10 px-3 py-2.5">
       {summary.rain_start_km !== null && (
         <p className="text-sm leading-snug">
-          Regen ab <strong>km {formatKm(summary.rain_start_km)}</strong>
-          {summary.rain_start_time && <>, gegen {formatTime(summary.rain_start_time)} Uhr</>}.
+          <Trans
+            i18nKey={summary.rain_start_time ? 'summary.rainFromAt' : 'summary.rainFrom'}
+            values={{
+              km: formatKm(summary.rain_start_km),
+              time: formatTime(summary.rain_start_time),
+            }}
+            components={[<strong key="km" />]}
+          />
         </p>
       )}
       <ul className="space-y-1">
@@ -144,7 +169,7 @@ function RainSection({ summary }: { summary: Summary }) {
                 className="h-2 w-5 shrink-0 rounded-full"
                 style={{ background: RAIN_COLOUR[tier] }}
               />
-              <span className="opacity-70">{RAIN_LABEL[tier]}</span>
+              <span className="opacity-70">{t(RAIN_KEY[tier])}</span>
               <span className="ml-auto font-semibold tabular-nums">
                 {formatKm(km)}
                 <span className="ml-1 text-xs font-normal opacity-45">km</span>

@@ -1,3 +1,4 @@
+import i18n from './i18n'
 import type { AnalyseRequest, Analysis } from './types'
 
 /** Send a GPX file to the backend and return the forecast along the route. */
@@ -19,13 +20,24 @@ export async function analyseRoute({
   return response.json()
 }
 
-/** Pull a readable message out of a failed response. */
+/**
+ * Turn a failed response into a message in the reader's language.
+ *
+ * The server sends a stable code alongside an English fallback, so the wording
+ * lives in the translations rather than in the API.
+ */
 async function readError(response: Response): Promise<string> {
   try {
-    const payload = await response.json()
-    if (typeof payload?.detail === 'string') return payload.detail
+    const detail = (await response.json())?.detail
+    const code = typeof detail === 'object' ? detail?.code : undefined
+
+    if (typeof code === 'string' && i18n.exists(`errors.${code}`)) {
+      return i18n.t(`errors.${code}` as 'errors.unknown')
+    }
+    if (typeof detail === 'string') return detail
+    if (typeof detail?.message === 'string') return detail.message
   } catch {
-    // Fall through to the status text below.
+    // Fall through to the status-based message below.
   }
-  return `Die Auswertung ist fehlgeschlagen (${response.status}).`
+  return i18n.t('errors.unknown', { status: response.status })
 }
