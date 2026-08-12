@@ -5,6 +5,11 @@ export type ThemePreference = 'system' | 'light' | 'dark'
 const STORAGE_KEY = 'aeolus:theme'
 const THEMES = { light: 'aeolus-light', dark: 'aeolus-dark' } as const
 
+// The browser chrome on phones takes its colour from here. It has to follow the
+// chosen theme, not the operating system, or the two disagree on a device set
+// to the opposite scheme.
+const CHROME = { light: '#fdfcf9', dark: '#231e19' } as const
+
 interface Theme {
   preference: ThemePreference
   setPreference: (preference: ThemePreference) => void
@@ -45,6 +50,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', THEMES[resolved])
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', CHROME[resolved])
     localStorage.setItem(STORAGE_KEY, preference)
   }, [preference, resolved])
 
