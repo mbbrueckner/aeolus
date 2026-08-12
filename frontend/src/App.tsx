@@ -12,7 +12,7 @@ import type { Analysis } from './types'
 
 export default function App() {
   const { t } = useTranslation()
-  const { preference, setPreference } = useTheme()
+  const { preference, setPreference, resolved } = useTheme()
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -137,6 +137,7 @@ export default function App() {
             onSlotChange={setSlot}
             playing={playing}
             onPlayingChange={setPlaying}
+            dark={resolved === 'dark'}
           />
         ) : (
           <EmptyState busy={busy} />

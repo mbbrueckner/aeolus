@@ -8,7 +8,7 @@ hit you. A slider plays the whole day in quarter-hour steps. Give it a departure
 time and average speed as well, and it also marks where you would be at any
 moment and what you should expect on arrival.
 
-A weather app tells you "18 km/h from the south-west". It does not tell you that
+A  weather app tells you "18 km/h from the south-west". It does not tell you that
 the first 20 km of *your* loop will be a grind and the way back will fly.
 
 **Try it: [aeolus.mbrueckner.dev](https://aeolus.mbrueckner.dev)**

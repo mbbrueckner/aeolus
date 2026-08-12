@@ -14,6 +14,11 @@ function storedPreference(): ThemePreference {
 /**
  * Track the theme preference and keep `data-theme` on the document in sync.
  *
+ * This owns state rather than reading a context, so calling it from a second
+ * component creates a second, independent copy that never hears about changes
+ * made through the first. Call it once, at the top, and pass what is needed
+ * down.
+ *
  * "system" deliberately stores no explicit theme, so the page keeps following
  * the operating system when it changes rather than freezing at whatever it was
  * on first load.
