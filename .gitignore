@@ -47,3 +47,6 @@ data/
 
 # macOS
 .DS_Store
+
+# Ad-hoc analysis scratch
+*_tmp.py
