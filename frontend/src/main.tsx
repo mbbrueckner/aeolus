@@ -4,11 +4,13 @@ import './index.css'
 import './i18n'
 import App from './App.tsx'
 import { ThemeProvider } from './theme'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <App />
+      <SpeedInsights />
     </ThemeProvider>
   </StrictMode>,
 )
