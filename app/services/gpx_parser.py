@@ -21,8 +21,6 @@ MAX_BEARING_DIFF_DEG = 30.0
 MIN_CLUSTER_DISTANCE_M = 750
 
 
-# --- Main Functions ---
-
 def get_clustered_route(file_content: bytes, avg_speed_kmh: float, start_time: datetime) -> ClusteredRoute:
     """Parse GPX file content and extract route clusters.
 
@@ -276,8 +274,6 @@ def write_gpx(points: list[RoutePoint]) -> bytes:
         )
     return gpx.to_xml().encode()
 
-
-# --- Helper Functions ---
 
 def _simplify(points: list[RoutePoint]) -> list[RoutePoint]:
     """Simplify a list of RoutePoints using the Ramer-Douglas-Peucker algorithm.
