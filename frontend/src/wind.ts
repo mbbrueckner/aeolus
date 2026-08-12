@@ -59,10 +59,11 @@ export function isNotable(segment: Segment): boolean {
  *
  * A single value cannot serve both themes: light map tiles need a dark line and
  * the inverted dark tiles need a light one, and anything in between washes out
- * on one of them.
+ * on one of them — over inverted water especially. Both are desaturated, so
+ * they stay quieter than the wind colours despite the contrast.
  */
 export function calmColour(dark: boolean): string {
-  return dark ? '#94a3b8' : '#475569'
+  return dark ? '#cbd5e1' : '#475569'
 }
 
 /** Colour for a segment's polyline, muted when the wind is unremarkable. */
