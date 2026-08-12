@@ -104,6 +104,7 @@ export const en: typeof de = {
     bad_start_time: 'The departure time could not be read.',
     bad_speed: 'The average speed is outside the plausible range.',
     unreadable_route: 'This route could not be analysed.',
+    rate_limited: 'Too many requests. Try again in a few minutes.',
     empty_route: 'The GPX file contains no usable track.',
     unknown: 'The analysis failed ({{status}}).',
   },

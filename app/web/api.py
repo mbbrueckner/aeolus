@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -36,6 +36,7 @@ from app.services.gpx_parser import get_clustered_route
 from app.services.route_scorer import SegmentScore
 from app.services.summary import RouteSummary, rain_tier
 from app.services.weather_field import WeatherField, fetch_field, route_bounds
+from app.web.rate_limit import Limit, SlidingWindow, client_key
 
 def _fail(status: int, code: str, message: str) -> HTTPException:
     """Build an error the front end can translate.
@@ -59,6 +60,15 @@ MAX_SPEED_KMH = 60.0
 # has not said how fast they ride.
 NOMINAL_SPEED_KMH = 20.0
 
+# One analysis costs one to three upstream forecast requests. The per-client
+# allowance is generous for a person and tight for a refresh loop; the global
+# one is what the forecast quota actually depends on.
+CLIENT_LIMIT = Limit(requests=20, per_seconds=600)
+GLOBAL_LIMIT = Limit(requests=300, per_seconds=3600)
+
+_per_client = SlidingWindow(CLIENT_LIMIT)
+_overall = SlidingWindow(GLOBAL_LIMIT)
+
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 app = FastAPI(title="Aeolus", description="Weather along your route")
@@ -69,6 +79,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 @app.post("/api/analyze")
 async def analyze(
+    request: Request,
     gpx: UploadFile = File(...),
     avg_speed_kmh: float | None = Form(None),
     start_time: str | None = Form(None),
@@ -76,6 +87,7 @@ async def analyze(
     """Analyze an uploaded GPX route against the forecast.
 
     Args:
+        request: The incoming request, for rate limiting.
         gpx: The uploaded GPX file.
         avg_speed_kmh: Average riding speed. Given together with a departure
             time, the response also carries conditions at each point on
@@ -89,6 +101,8 @@ async def analyze(
     Raises:
         HTTPException: If the upload is unusable or the inputs are out of range.
     """
+    _enforce_limits(request)
+
     content = await _read_upload(gpx)
     departure = _parse_start_time(start_time)
     speed = _validate_speed(avg_speed_kmh)
@@ -119,6 +133,26 @@ async def analyze(
     payload = _to_payload(route, snapshots, scores, summary)
     payload["field"] = _fetch_field_for(route, reference)
     return payload
+
+
+def _enforce_limits(request: Request) -> None:
+    """Reject the request if either allowance is spent.
+
+    Args:
+        request: The incoming request.
+
+    Raises:
+        HTTPException: With 429 and a Retry-After header when over the limit.
+    """
+    peer = request.client.host if request.client else None
+    for window, key in ((_overall, ""), (_per_client, client_key(request.headers, peer))):
+        wait = window.retry_after(key)
+        if wait is not None:
+            raise HTTPException(
+                429,
+                {"code": "rate_limited", "message": "too many requests, try again shortly"},
+                headers={"Retry-After": str(max(1, int(wait) + 1))},
+            )
 
 
 async def _read_upload(gpx: UploadFile) -> bytes:

@@ -11,10 +11,17 @@ from app.analyzer import RouteAnalysis
 from app.models import ClusteredRoute, ClusterWeatherSnapshot, RoutePoint, Segment, SegmentCluster
 from app.services.route_scorer import score_segment
 from app.services.summary import summarise
-from app.web.api import app
+from app.web.api import app, _overall, _per_client
 from test_summary import make_snapshot
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def fresh_limits():
+    """The limiters are process-wide, so each test needs a clean slate."""
+    _overall.clear()
+    _per_client.clear()
 
 GPX = b"""<?xml version="1.0"?>
 <gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
@@ -337,3 +344,67 @@ def test_a_speed_without_a_time_is_still_route_only():
 
 def test_an_implausible_speed_is_rejected_even_without_a_time():
     assert post_without_ride(avg_speed_kmh="99").status_code == 422
+
+
+# ── Rate limiting ─────────────────────────────────────────────────
+
+def test_a_burst_from_one_client_is_eventually_held():
+    from app.web.api import CLIENT_LIMIT
+
+    codes = [post(analysis_of([make_snapshot()])).status_code
+             for _ in range(CLIENT_LIMIT.requests + 1)]
+
+    assert codes[:-1] == [200] * CLIENT_LIMIT.requests
+    assert codes[-1] == 429
+
+def test_a_held_request_says_how_long_to_wait():
+    from app.web.api import CLIENT_LIMIT
+
+    for _ in range(CLIENT_LIMIT.requests):
+        post(analysis_of([make_snapshot()]))
+    response = post(analysis_of([make_snapshot()]))
+
+    assert response.status_code == 429
+    assert int(response.headers["retry-after"]) > 0
+
+def test_a_held_request_carries_a_translatable_code():
+    from app.web.api import CLIENT_LIMIT
+
+    for _ in range(CLIENT_LIMIT.requests):
+        post(analysis_of([make_snapshot()]))
+
+    assert post(analysis_of([make_snapshot()])).json()["detail"]["code"] == "rate_limited"
+
+def test_another_client_is_unaffected():
+    """One person's refresh loop must not lock everybody else out."""
+    from app.web.api import CLIENT_LIMIT
+
+    for _ in range(CLIENT_LIMIT.requests + 1):
+        post(analysis_of([make_snapshot()]))
+
+    files = {"gpx": ("route.gpx", io.BytesIO(GPX), "application/gpx+xml")}
+    with patch("app.web.api.fetch_field", side_effect=stub_field):
+        other = client.post(
+            "/api/analyze", files=files, headers={"CF-Connecting-IP": "203.0.113.9"}
+        )
+
+    assert other.status_code == 200
+
+def test_the_global_limit_holds_regardless_of_client():
+    """Forging the client header must not get past the quota guard."""
+    from app.web.api import GLOBAL_LIMIT
+
+    files = lambda: {"gpx": ("route.gpx", io.BytesIO(GPX), "application/gpx+xml")}
+    codes = []
+    with patch("app.web.api.fetch_field", side_effect=stub_field):
+        for i in range(GLOBAL_LIMIT.requests + 1):
+            codes.append(
+                client.post(
+                    "/api/analyze",
+                    files=files(),
+                    headers={"CF-Connecting-IP": f"203.0.113.{i % 250}"},
+                ).status_code
+            )
+
+    assert codes[-1] == 429
+    assert codes.count(200) <= GLOBAL_LIMIT.requests

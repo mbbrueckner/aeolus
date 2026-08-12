@@ -55,6 +55,7 @@ describe('translations', () => {
       'bad_speed',
       'unreadable_route',
       'empty_route',
+      'rate_limited',
       'unknown',
     ]
     expect(Object.keys(de.errors).sort()).toEqual([...codes].sort())

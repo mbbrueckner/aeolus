@@ -101,6 +101,7 @@ export const de = {
     bad_start_time: 'Die Abfahrtszeit konnte nicht gelesen werden.',
     bad_speed: 'Der Schnitt liegt außerhalb des plausiblen Bereichs.',
     unreadable_route: 'Diese Route konnte nicht ausgewertet werden.',
+    rate_limited: 'Zu viele Anfragen. Versuch es in ein paar Minuten noch einmal.',
     empty_route: 'Die GPX-Datei enthält keine verwertbare Strecke.',
     unknown: 'Die Auswertung ist fehlgeschlagen ({{status}}).',
   },
