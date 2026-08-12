@@ -45,14 +45,23 @@ reasoning is written up in that module.
 
 ## Quick start
 
+The quickest way needs nothing but Docker:
+
+```bash
+docker compose up
+```
+
+Or run it from source:
+
 ```bash
 uv sync --all-extras
 npm --prefix frontend install
 npm --prefix frontend run build
-uv run --extra web uvicorn app.web.api:app
+uv run --extra server uvicorn app.web.api:app
 ```
 
-Then open <http://localhost:8000>. A sample route is not included, since GPS
+Either way, open <http://localhost:8000>. No configuration is required —
+Open-Meteo needs no API key, and nothing is stored. A sample route is not included, since GPS
 traces are personal data — export one from Komoot, Strava or Garmin Connect.
 
 ### Development
@@ -61,7 +70,7 @@ Run the two halves separately so the front end keeps hot reloading. Vite proxies
 `/api` through to the backend.
 
 ```bash
-uv run --extra web uvicorn app.web.api:app --reload
+uv run --extra server uvicorn app.web.api:app --reload
 npm --prefix frontend run dev
 ```
 

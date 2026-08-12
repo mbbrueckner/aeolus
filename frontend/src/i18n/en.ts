@@ -100,7 +100,7 @@ export const en: typeof de = {
 
   errors: {
     empty_upload: 'The file is empty.',
-    too_large: 'The file is too large.',
+    too_large: 'The file is too large. The server accepts up to 4 MB.',
     bad_start_time: 'The departure time could not be read.',
     bad_speed: 'The average speed is outside the plausible range.',
     unreadable_route: 'This route could not be analysed.',

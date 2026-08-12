@@ -1,0 +1,20 @@
+# Runs the whole app — front end and API — on http://localhost:8000
+#
+# No configuration is needed: Open-Meteo requires no key, and nothing is stored,
+# so there is no volume and no database.
+services:
+  aeolus:
+    build: .
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    # Nothing is written at runtime; uploads are parsed in memory.
+    read_only: true
+    # Keeps the app from crowding out anything else on a small machine.
+    cpus: 0.5
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

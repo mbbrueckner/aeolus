@@ -16,11 +16,11 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.8 /uv /usr/local/bin/uv
 
 # Dependencies before source, so edits do not invalidate the install layer.
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --extra web --no-install-project
+RUN uv sync --frozen --no-dev --extra server --no-install-project
 
 COPY app/ ./app/
 COPY --from=frontend /build/dist ./frontend/dist
-RUN uv sync --frozen --no-dev --extra web
+RUN uv sync --frozen --no-dev --extra server
 
 # Nothing is written at runtime: uploads are parsed in memory and no database
 # is involved, so the container can run read-only.

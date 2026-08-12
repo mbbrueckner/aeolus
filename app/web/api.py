@@ -53,7 +53,9 @@ def _fail(status: int, code: str, message: str) -> HTTPException:
     return HTTPException(status, {"code": code, "message": message})
 
 
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+# Vercel rejects request bodies over 4.5 MB before they reach the function, so
+# refusing a little earlier here turns a platform error into a clear message.
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 MIN_SPEED_KMH = 5.0
 MAX_SPEED_KMH = 60.0
 

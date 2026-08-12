@@ -97,7 +97,7 @@ export const de = {
 
   errors: {
     empty_upload: 'Die Datei ist leer.',
-    too_large: 'Die Datei ist zu groß.',
+    too_large: 'Die Datei ist zu groß. Mehr als 4 MB nimmt der Server nicht an.',
     bad_start_time: 'Die Abfahrtszeit konnte nicht gelesen werden.',
     bad_speed: 'Der Schnitt liegt außerhalb des plausiblen Bereichs.',
     unreadable_route: 'Diese Route konnte nicht ausgewertet werden.',
