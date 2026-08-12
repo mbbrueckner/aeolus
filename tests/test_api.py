@@ -408,3 +408,21 @@ def test_the_global_limit_holds_regardless_of_client():
 
     assert codes[-1] == 429
     assert codes.count(200) <= GLOBAL_LIMIT.requests
+
+def test_route_alone_has_no_times_at_all():
+    """The rider marker is placed from these; without a ride there is no rider."""
+    segment = post_without_ride().json()["segments"][0]
+
+    assert segment["time"] is None
+    assert segment["entry_time"] is None
+    assert segment["exit_time"] is None
+
+def test_a_described_ride_does_carry_entry_and_exit_times():
+    snapshot = make_snapshot()
+    snapshot.cluster.entry_time = datetime(2026, 8, 12, 14, 0, tzinfo=timezone.utc)
+    snapshot.cluster.exit_time = datetime(2026, 8, 12, 14, 12, tzinfo=timezone.utc)
+
+    segment = post(analysis_of([snapshot]), field=stub_field).json()["segments"][0]
+
+    assert segment["entry_time"] is not None
+    assert segment["exit_time"] is not None

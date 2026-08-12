@@ -348,8 +348,11 @@ def _segment_payload(
         "start_distance_km": start_km,
         "mid_distance_km": start_km + cluster.total_distance_m / 2000.0,
         "bearing_deg": cluster.mean_bearing,
-        "entry_time": _isoformat(cluster.entry_time),
-        "exit_time": _isoformat(cluster.exit_time),
+        # Times are derived from a departure and a speed. Without those the
+        # clustering still produces them from a nominal pace, but they would
+        # place a rider who never said when they are riding.
+        "entry_time": None,
+        "exit_time": None,
         "time": None,
         "wind_speed_km_h": None,
         "wind_direction_deg": None,
@@ -369,6 +372,8 @@ def _segment_payload(
     snapshot, score = arrival
     payload.update(
         {
+            "entry_time": _isoformat(cluster.entry_time),
+            "exit_time": _isoformat(cluster.exit_time),
             "time": _isoformat(snapshot.timestamp),
             "wind_speed_km_h": snapshot.wind_speed_km_h,
             "wind_direction_deg": snapshot.wind_direction_deg,
