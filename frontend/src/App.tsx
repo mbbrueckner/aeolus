@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+import { Analytics } from '@vercel/analytics/react'
 import { analyseRoute } from './api'
 import { ControlPanel } from './components/ControlPanel'
 import { RouteMap } from './components/RouteMap'
@@ -56,8 +57,10 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-base-200 lg:h-full lg:flex-row">
-      <aside className="flex w-full shrink-0 flex-col gap-6 border-base-300/70 bg-base-100 p-6 lg:w-[23rem] lg:overflow-y-auto lg:border-r">
+    <>
+      <Analytics />
+      <div className="flex min-h-full flex-col bg-base-200 lg:h-full lg:flex-row">
+        <aside className="flex w-full shrink-0 flex-col gap-6 border-base-300/70 bg-base-100 p-6 lg:w-[23rem] lg:overflow-y-auto lg:border-r">
         <header className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <WindMark />
@@ -107,7 +110,8 @@ export default function App() {
       {/* Portrait phones stack the panel above the map, which would bury the
           footer in the middle of the page. */}
       <SiteFooter className="bg-base-100 px-6 pt-4 pb-6 lg:hidden" />
-    </div>
+      </div>
+    </>
   )
 }
 
