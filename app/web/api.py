@@ -29,6 +29,7 @@ import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from app.analyzer import RouteAnalysis, analyze_route
 from app.models import ClusteredRoute, ClusterWeatherSnapshot, SegmentCluster
@@ -112,7 +113,9 @@ async def analyze(
 
     try:
         if describes_a_ride:
-            analysis = analyze_route(content, speed, departure)
+            # Parsing and the upstream forecast call both block. Off the event
+            # loop they go, or one request would stall every other one.
+            analysis = await run_in_threadpool(analyze_route, content, speed, departure)
             route, snapshots, scores, summary = (
                 analysis.route,
                 analysis.snapshots,
@@ -120,7 +123,9 @@ async def analyze(
                 analysis.summary,
             )
         else:
-            route = get_clustered_route(content, speed or NOMINAL_SPEED_KMH, reference)
+            route = await run_in_threadpool(
+                get_clustered_route, content, speed or NOMINAL_SPEED_KMH, reference
+            )
             snapshots, scores, summary = None, None, None
     except HTTPException:
         raise
@@ -131,7 +136,7 @@ async def analyze(
         raise _fail(422, "empty_route", "the GPX file contains no usable track")
 
     payload = _to_payload(route, snapshots, scores, summary)
-    payload["field"] = _fetch_field_for(route, reference)
+    payload["field"] = await run_in_threadpool(_fetch_field_for, route, reference)
     return payload
 
 
