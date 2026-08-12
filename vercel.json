@@ -3,7 +3,8 @@
   "buildCommand": "npm --prefix frontend ci && npm --prefix frontend run build",
   "functions": {
     "app/web/api.py": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "excludeFiles": "{tests/**,notebooks/**,scripts/**,app/calibration/**,frontend/node_modules/**,frontend/src/**,frontend/public/**,data/**,.venv/**,.git/**}"
     }
   }
 }
