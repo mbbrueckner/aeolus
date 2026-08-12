@@ -4,7 +4,7 @@ export const de = {
     disclaimer:
       'Wo dich der Wind auf der Route trifft, ist gegen aufgezeichnete Fahrten geprüft. Wie stark er sich anfühlt, hängt an Hecken, Senken und Bebauung und lässt sich aus einer Vorhersage nicht zuverlässig ableiten.',
     attribution: 'Wetter von <0>Open-Meteo</0>, Karte von OpenStreetMap.',
-    builtBy: 'Gebaut von <0>mbbrueckner</0> · <1>Quellcode</1> · <2>mbrueckner.dev</2>',
+    builtBy: 'Gebaut von <0>Mika Brückner</0> · <1>Quellcode</1>',
   },
 
   empty: {

@@ -94,28 +94,21 @@ export default function App() {
               i18nKey="app.builtBy"
               components={[
                 <a
-                  key="profile"
-                  href="https://github.com/mbbrueckner"
-                  target="_blank"
-                  rel="noopener"
-                  className="link inline-flex items-center gap-1"
-                >
-                  <GitHubMark />
-                </a>,
-                <a
-                  key="source"
-                  href="https://github.com/mbbrueckner/aeolus"
-                  target="_blank"
-                  rel="noopener"
-                  className="link"
-                />,
-                <a
                   key="site"
                   href="https://mbrueckner.dev/"
                   target="_blank"
                   rel="noopener"
                   className="link"
                 />,
+                <a
+                  key="source"
+                  href="https://github.com/mbbrueckner/aeolus"
+                  target="_blank"
+                  rel="noopener"
+                  className="link inline-flex items-center gap-1"
+                >
+                  <GitHubMark />
+                </a>,
               ]}
             />
           </p>
