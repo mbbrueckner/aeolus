@@ -1,0 +1,17 @@
+# Recorded rides and the weather cache are personal data and must never ship.
+data/
+.weather_cache/
+
+.git/
+.venv/
+frontend/node_modules/
+frontend/dist/
+notebooks/
+tests/
+scripts/
+app/calibration/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.idea/
+.vscode/

@@ -47,7 +47,3 @@ data/
 
 # macOS
 .DS_Store
-
-# Deployment stays out of the public repo
-Dockerfile
-.dockerignore
