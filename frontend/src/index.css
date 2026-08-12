@@ -137,8 +137,16 @@ body {
   color: var(--color-primary) !important;
 }
 
-/* Dark map tiles: OpenStreetMap only ships a light raster set. */
-[data-theme="aeolus-dark"] .leaflet-tile-pane {
+/*
+ * Dark map tiles: OpenStreetMap only ships a light raster set, so they are
+ * inverted here.
+ *
+ * The filter sits on each tile rather than on the pane that holds them. One
+ * filter over the whole pane is a single huge composited layer, and Safari was
+ * leaving parts of it stale — showing an earlier, un-inverted view in a corner
+ * of the map. Per tile, each image repaints with its own contents.
+ */
+[data-theme="aeolus-dark"] .leaflet-tile {
   filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.75);
 }
 

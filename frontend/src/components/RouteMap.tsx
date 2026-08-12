@@ -94,6 +94,7 @@ export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChang
         {riderPosition && <Marker position={riderPosition} icon={riderIcon(atRideTime)} />}
 
         <FitToRoute segments={segments} />
+        <FollowContainerSize />
       </MapContainer>
 
       <Legend dark={dark} />
@@ -242,6 +243,25 @@ function Row({
       </dd>
     </div>
   )
+}
+
+/**
+ * Tell Leaflet when its container changes size.
+ *
+ * Leaflet measures once and listens only to window resizes, so a container that
+ * changes for any other reason — a layout switch, the panel growing — leaves it
+ * drawing tiles for the old size.
+ */
+function FollowContainerSize() {
+  const map = useMap()
+
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize())
+    observer.observe(map.getContainer())
+    return () => observer.disconnect()
+  }, [map])
+
+  return null
 }
 
 /** Pan and zoom so the whole route is visible whenever it changes. */
