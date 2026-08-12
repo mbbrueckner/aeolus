@@ -11,6 +11,8 @@ moment and what you should expect on arrival.
 A weather app tells you "18 km/h from the south-west". It does not tell you that
 the first 20 km of *your* loop will be a grind and the way back will fly.
 
+**Try it: [aeolus.mbrueckner.dev](https://aeolus.mbrueckner.dev)**
+
 ---
 
 ## What is checked, and what is not
