@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useTheme } from '../theme'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { Analysis, Field, Segment } from '../types'
@@ -32,17 +33,10 @@ interface Props {
   onSlotChange: (slot: number) => void
   playing: boolean
   onPlayingChange: (playing: boolean) => void
-  dark: boolean
 }
 
-export function RouteMap({
-  analysis,
-  slot,
-  onSlotChange,
-  playing,
-  onPlayingChange,
-  dark,
-}: Props) {
+export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChange }: Props) {
+  const dark = useTheme().resolved === 'dark'
   const { field, segments, route } = analysis
 
   const rideStart = firstTime(segments)
