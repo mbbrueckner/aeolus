@@ -56,8 +56,8 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-base-200 lg:flex-row">
-      <aside className="flex w-full shrink-0 flex-col gap-6 overflow-y-auto border-base-300/70 bg-base-100 p-6 lg:w-[23rem] lg:border-r">
+    <div className="flex min-h-full flex-col bg-base-200 lg:h-full lg:flex-row">
+      <aside className="flex w-full shrink-0 flex-col gap-6 border-base-300/70 bg-base-100 p-6 lg:w-[23rem] lg:overflow-y-auto lg:border-r">
         <header className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <WindMark />
@@ -87,46 +87,7 @@ export default function App() {
           </>
         )}
 
-        <footer className="mt-auto space-y-2 border-t border-base-300/60 pt-4 text-[11px] leading-relaxed opacity-45">
-          <p>{t('app.disclaimer')}</p>
-          <p>
-            <Trans
-              i18nKey="app.builtBy"
-              components={[
-                <a
-                  key="site"
-                  href="https://mbrueckner.dev/"
-                  target="_blank"
-                  rel="noopener"
-                  className="link"
-                />,
-                <a
-                  key="source"
-                  href="https://github.com/mbbrueckner/aeolus"
-                  target="_blank"
-                  rel="noopener"
-                  className="link inline-flex items-center gap-1"
-                >
-                  <GitHubMark />
-                </a>,
-              ]}
-            />
-          </p>
-          <p>
-            <Trans
-              i18nKey="app.attribution"
-              components={[
-                <a
-                  key="open-meteo"
-                  href="https://open-meteo.com/"
-                  target="_blank"
-                  rel="noopener"
-                  className="link"
-                />,
-              ]}
-            />
-          </p>
-        </footer>
+        <SiteFooter className="mt-auto hidden lg:block" />
       </aside>
 
       <main className="relative min-h-[55vh] flex-1">
@@ -142,7 +103,60 @@ export default function App() {
           <EmptyState busy={busy} />
         )}
       </main>
+
+      {/* Portrait phones stack the panel above the map, which would bury the
+          footer in the middle of the page. */}
+      <SiteFooter className="bg-base-100 px-6 pt-4 pb-6 lg:hidden" />
     </div>
+  )
+}
+
+function SiteFooter({ className = '' }: { className?: string }) {
+  const { t } = useTranslation()
+
+  return (
+    <footer
+      className={`space-y-2 border-t border-base-300/60 pt-4 text-[11px] leading-relaxed opacity-45 ${className}`}
+    >
+      <p>{t('app.disclaimer')}</p>
+      <p>
+        <Trans
+          i18nKey="app.builtBy"
+          components={[
+            <a
+              key="site"
+              href="https://mbrueckner.dev/"
+              target="_blank"
+              rel="noopener"
+              className="link"
+            />,
+            <a
+              key="source"
+              href="https://github.com/mbbrueckner/aeolus"
+              target="_blank"
+              rel="noopener"
+              className="link inline-flex items-center gap-1"
+            >
+              <GitHubMark />
+            </a>,
+          ]}
+        />
+      </p>
+      <p>
+        <Trans
+          i18nKey="app.attribution"
+          components={[
+            <a
+              key="open-meteo"
+              href="https://open-meteo.com/"
+              target="_blank"
+              rel="noopener"
+              className="link"
+            />,
+          ]}
+        />
+      </p>
+    </footer>
   )
 }
 
