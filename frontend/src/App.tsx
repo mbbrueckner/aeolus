@@ -90,7 +90,7 @@ export default function App() {
         <SiteFooter className="mt-auto hidden lg:block" />
       </aside>
 
-      <main className="relative min-h-[55vh] flex-1">
+      <main className="relative h-[60vh] shrink-0 lg:h-auto lg:flex-1">
         {analysis ? (
           <RouteMap
             analysis={analysis}
