@@ -94,7 +94,7 @@ export default function App() {
               i18nKey="app.builtBy"
               components={[
                 <a
-                  key="github"
+                  key="profile"
                   href="https://github.com/mbbrueckner"
                   target="_blank"
                   rel="noopener"
@@ -102,6 +102,20 @@ export default function App() {
                 >
                   <GitHubMark />
                 </a>,
+                <a
+                  key="source"
+                  href="https://github.com/mbbrueckner/aeolus"
+                  target="_blank"
+                  rel="noopener"
+                  className="link"
+                />,
+                <a
+                  key="site"
+                  href="https://mbrueckner.dev/"
+                  target="_blank"
+                  rel="noopener"
+                  className="link"
+                />,
               ]}
             />
           </p>
@@ -151,7 +165,6 @@ function GitHubMark() {
           3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0
           .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
       </svg>
-      mbbrueckner
     </>
   )
 }

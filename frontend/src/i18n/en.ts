@@ -7,7 +7,7 @@ export const en: typeof de = {
     disclaimer:
       'Where the wind meets you on a route has been checked against recorded rides. How hard it feels depends on hedges, dips and buildings, and cannot be read reliably off a forecast.',
     attribution: 'Weather by <0>Open-Meteo</0>, map by OpenStreetMap.',
-    builtBy: 'Built by <0>mbbrueckner</0>',
+    builtBy: 'Built by <0>mbbrueckner</0> · <1>Source</1> · <2>mbrueckner.dev</2>',
   },
 
   empty: {
