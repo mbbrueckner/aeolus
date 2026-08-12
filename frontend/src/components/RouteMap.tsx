@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useTheme } from '../theme'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { Analysis, Field, Segment } from '../types'
@@ -14,6 +15,7 @@ import {
 import {
   ALIGNMENT_COLOUR,
   ALIGNMENT_KEY,
+  calmColour,
   RAIN_COLOUR,
   RAIN_KEY,
   arrowRotation,
@@ -34,6 +36,7 @@ interface Props {
 }
 
 export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChange }: Props) {
+  const dark = useTheme().resolved === 'dark'
   const { field, segments, route } = analysis
 
   const rideStart = firstTime(segments)
@@ -68,7 +71,7 @@ export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChang
             key={`line-${index}`}
             positions={segment.coordinates}
             pathOptions={{
-              color: colourAt(analysis, segment, slot),
+              color: colourAt(analysis, segment, slot, dark),
               weight: 6,
               opacity: 0.92,
               dashArray: segment.unsafe ? '10 8' : undefined,
@@ -80,7 +83,7 @@ export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChang
           <Marker
             key={`arrow-${index}`}
             position={segment.point}
-            icon={pinIcon(segment, field, slot)}
+            icon={pinIcon(segment, field, slot, dark)}
           >
             <Popup>
               <SegmentPopup segment={segment} />
@@ -93,7 +96,7 @@ export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChang
         <FitToRoute segments={segments} />
       </MapContainer>
 
-      <Legend />
+      <Legend dark={dark} />
 
       {field && field.slots.length > 1 && (
         <TimeSlider
@@ -111,17 +114,17 @@ export function RouteMap({ analysis, slot, onSlotChange, playing, onPlayingChang
 }
 
 /** Colour a stretch by the wind at the displayed time, not at arrival. */
-function colourAt(analysis: Analysis, segment: Segment, slot: number): string {
-  if (!analysis.field) return segmentColour(segment)
+function colourAt(analysis: Analysis, segment: Segment, slot: number, dark: boolean): string {
+  if (!analysis.field) return segmentColour(segment, dark)
 
   const [lat, lon] = segment.point
   const wind = windOnRoute(analysis.field, lat, lon, slot, segment.bearing_deg)
 
-  if (Math.max(Math.abs(wind.headwindKmH), wind.crosswindKmH) < 12) return '#94a3b8'
+  if (Math.max(Math.abs(wind.headwindKmH), wind.crosswindKmH) < 12) return calmColour(dark)
   return ALIGNMENT_COLOUR[wind.alignment]
 }
 
-function Legend() {
+function Legend({ dark }: { dark: boolean }) {
   const { t } = useTranslation()
 
   return (
@@ -138,7 +141,7 @@ function Legend() {
           </li>
         ))}
         <li className="flex items-center gap-2 opacity-60">
-          <span className="h-1 w-6 rounded-full bg-slate-400" />
+          <span className="h-1 w-6 rounded-full" style={{ background: calmColour(dark) }} />
           {t('wind.calm')}
         </li>
       </ul>
@@ -263,8 +266,8 @@ function FitToRoute({ segments }: { segments: Segment[] }) {
  * Reads the field at the displayed time rather than the arrival weather, so
  * the arrows turn with the slider instead of standing still.
  */
-function pinIcon(segment: Segment, field: Field | null, slot: number): L.DivIcon {
-  let colour = '#64748b'
+function pinIcon(segment: Segment, field: Field | null, slot: number, dark: boolean): L.DivIcon {
+  let colour = calmColour(dark)
   let rotation = arrowRotation(segment.wind_direction_deg ?? 0)
 
   if (field) {
@@ -272,7 +275,7 @@ function pinIcon(segment: Segment, field: Field | null, slot: number): L.DivIcon
     const wind = windOnRoute(field, lat, lon, slot, segment.bearing_deg)
     const notable = Math.max(Math.abs(wind.headwindKmH), wind.crosswindKmH) >= 12
 
-    colour = notable ? ALIGNMENT_COLOUR[wind.alignment] : '#64748b'
+    colour = notable ? ALIGNMENT_COLOUR[wind.alignment] : calmColour(dark)
     rotation = arrowRotation(windDirectionDeg(sampleField(field, lat, lon, slot)))
   } else if (isNotable(segment) && segment.alignment) {
     colour = ALIGNMENT_COLOUR[segment.alignment]

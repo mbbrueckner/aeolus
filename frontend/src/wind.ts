@@ -54,9 +54,20 @@ export function isNotable(segment: Segment): boolean {
   )
 }
 
+/**
+ * Neutral colour for stretches where the wind is not worth a direction.
+ *
+ * A single value cannot serve both themes: light map tiles need a dark line and
+ * the inverted dark tiles need a light one, and anything in between washes out
+ * on one of them.
+ */
+export function calmColour(dark: boolean): string {
+  return dark ? '#94a3b8' : '#475569'
+}
+
 /** Colour for a segment's polyline, muted when the wind is unremarkable. */
-export function segmentColour(segment: Segment): string {
-  if (!isNotable(segment) || !segment.alignment) return '#94a3b8'
+export function segmentColour(segment: Segment, dark: boolean): string {
+  if (!isNotable(segment) || !segment.alignment) return calmColour(dark)
   return ALIGNMENT_COLOUR[segment.alignment]
 }
 
